@@ -8,6 +8,8 @@ import { GameProvider, useGame } from './context/GameContext';
 import { TitleScreen } from './components/TitleScreen';
 import { WorldMap } from './components/WorldMap';
 import { CivHub } from './components/CivHub';
+import { PuzzleScreen } from './components/PuzzleScreen';
+import { MechanismScreen } from './components/MechanismScreen';
 import { AssemblyScreen } from './components/AssemblyScreen';
 
 const GameShell: React.FC = () => {
@@ -20,9 +22,11 @@ const GameShell: React.FC = () => {
       case 'WORLD_MAP':
         return <WorldMap />;
       case 'CIV_HUB':
-      case 'PUZZLE':
-      case 'MECHANISM':
         return <CivHub />;
+      case 'PUZZLE':
+        return <PuzzleScreen />;
+      case 'MECHANISM':
+        return <MechanismScreen />;
       case 'ASSEMBLY':
       case 'COMPLETION':
         return <AssemblyScreen />;

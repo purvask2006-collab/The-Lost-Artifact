@@ -9,29 +9,156 @@ import { soundManager } from '../utils/audio';
 interface PixelOverworldMapProps {
   onSelectLocation: (target: LocationTarget) => void;
   activeLocationId: string | null;
+  onSelectCivilization?: (civId: CivilizationId) => void;
 }
+
+interface NodeCoord {
+  x: number;
+  y: number;
+  civId: CivilizationId;
+  type: 'puzzle' | 'mechanism';
+  id: PuzzleId | MechanismId;
+  name: string;
+  chamberNum: string;
+  relicIcon: string;
+  relicName: string;
+}
+
+const MAP_NODES: Record<string, NodeCoord> = {
+  // India (Left Realm)
+  india_puzzle_1: {
+    x: 160,
+    y: 520,
+    civId: 'india',
+    type: 'puzzle',
+    id: 'india_puzzle_1',
+    name: 'The Cracked Courtyard',
+    chamberNum: 'CHAMBER I',
+    relicIcon: '☀️',
+    relicName: 'Golden Gnomon',
+  },
+  india_puzzle_2: {
+    x: 485,
+    y: 715,
+    civId: 'india',
+    type: 'puzzle',
+    id: 'india_puzzle_2',
+    name: 'The Five Hearths',
+    chamberNum: 'CHAMBER II',
+    relicIcon: '🪷',
+    relicName: 'Ruby Lotus Key',
+  },
+  india_mechanism: {
+    x: 350,
+    y: 355,
+    civId: 'india',
+    type: 'mechanism',
+    id: 'india_mechanism',
+    name: 'The Chakra of Balance',
+    chamberNum: 'GRAND MECHANISM',
+    relicIcon: '☸',
+    relicName: 'Solar Wheel',
+  },
+
+  // Egypt (Center Realm)
+  egypt_puzzle_1: {
+    x: 770,
+    y: 575,
+    civId: 'egypt',
+    type: 'puzzle',
+    id: 'egypt_puzzle_1',
+    name: 'The Scattered Ceiling',
+    chamberNum: 'CHAMBER I',
+    relicIcon: '☀️',
+    relicName: 'Sun Symbol 1',
+  },
+  egypt_puzzle_2: {
+    x: 1190,
+    y: 605,
+    civId: 'egypt',
+    type: 'puzzle',
+    id: 'egypt_puzzle_2',
+    name: 'The Cracked Basin',
+    chamberNum: 'CHAMBER II',
+    relicIcon: '☥',
+    relicName: 'Sun Symbol 2',
+  },
+  egypt_mechanism: {
+    x: 975,
+    y: 335,
+    civId: 'egypt',
+    type: 'mechanism',
+    id: 'egypt_mechanism',
+    name: 'The Pyramid of Secrets',
+    chamberNum: 'GRAND MECHANISM',
+    relicIcon: '𓁹',
+    relicName: 'Eternal Eye',
+  },
+
+  // Japan (Right Realm)
+  japan_puzzle_1: {
+    x: 1410,
+    y: 635,
+    civId: 'japan',
+    type: 'puzzle',
+    id: 'japan_puzzle_1',
+    name: 'The Misplaced Screen',
+    chamberNum: 'CHAMBER I',
+    relicIcon: '🎐',
+    relicName: 'Spirit Seal 1',
+  },
+  japan_puzzle_2: {
+    x: 1805,
+    y: 625,
+    civId: 'japan',
+    type: 'puzzle',
+    id: 'japan_puzzle_2',
+    name: 'The Bell Sequence',
+    chamberNum: 'CHAMBER II',
+    relicIcon: '📿',
+    relicName: 'Spirit Seal 2',
+  },
+  japan_mechanism: {
+    x: 1605,
+    y: 430,
+    civId: 'japan',
+    type: 'mechanism',
+    id: 'japan_mechanism',
+    name: 'The Shrine of Memories',
+    chamberNum: 'GRAND MECHANISM',
+    relicIcon: '⛩',
+    relicName: 'Celestial Mirror',
+  },
+};
 
 export const PixelOverworldMap: React.FC<PixelOverworldMapProps> = ({
   onSelectLocation,
   activeLocationId,
+  onSelectCivilization,
 }) => {
-  const { state } = useGame();
+  const { state, selectCivilization, goToScreen, openChamber, openMechanism } = useGame();
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [hoveredCivId, setHoveredCivId] = useState<CivilizationId | null>(null);
   const [playerDirection, setPlayerDirection] = useState<SpriteDirection>('south');
-  const [prevPos, setPrevPos] = useState<{ x: number; y: number }>({ x: 500, y: 470 });
+  const [prevPos, setPrevPos] = useState<{ x: number; y: number }>({ x: 160, y: 520 });
 
   // Progression checks
-  const isIndiaMechanismUnlocked = state.unlockedMechanisms.india_mechanism;
-  const isJapanMechanismUnlocked = state.unlockedMechanisms.japan_mechanism;
+  const isIndiaMechanismUnlocked = Boolean(state.unlockedMechanisms.india_mechanism);
+  const isJapanMechanismUnlocked = Boolean(state.unlockedMechanisms.japan_mechanism);
+  const isEgyptMechanismUnlocked = Boolean(state.unlockedMechanisms.egypt_mechanism);
 
+  // Linear progression: India -> Japan -> Egypt
   const isJapanUnlocked = isIndiaMechanismUnlocked;
   const isEgyptUnlocked = isJapanMechanismUnlocked;
 
-  // Determine status for India locations
-  const getIndiaPuzzle1Status = (): 'available' | 'completed' | 'locked' => 
+  const fragmentsCount = Object.values(state.recoveredFragments).filter(Boolean).length;
+  const allFragmentsRecovered = fragmentsCount === 3;
+
+  // Status checks for India
+  const getIndiaPuzzle1Status = (): 'available' | 'completed' | 'locked' =>
     state.solvedPuzzles.india_puzzle_1 ? 'completed' : 'available';
 
-  const getIndiaPuzzle2Status = (): 'available' | 'completed' | 'locked' => 
+  const getIndiaPuzzle2Status = (): 'available' | 'completed' | 'locked' =>
     state.solvedPuzzles.india_puzzle_2 ? 'completed' : 'available';
 
   const getIndiaMechanismStatus = (): 'available' | 'completed' | 'locked' => {
@@ -40,7 +167,7 @@ export const PixelOverworldMap: React.FC<PixelOverworldMapProps> = ({
     return 'locked';
   };
 
-  // Determine status for Japan locations
+  // Status checks for Japan
   const getJapanPuzzle1Status = (): 'available' | 'completed' | 'locked' => {
     if (!isJapanUnlocked) return 'locked';
     return state.solvedPuzzles.japan_puzzle_1 ? 'completed' : 'available';
@@ -58,7 +185,7 @@ export const PixelOverworldMap: React.FC<PixelOverworldMapProps> = ({
     return 'locked';
   };
 
-  // Determine status for Egypt locations
+  // Status checks for Egypt
   const getEgyptPuzzle1Status = (): 'available' | 'completed' | 'locked' => {
     if (!isEgyptUnlocked) return 'locked';
     return state.solvedPuzzles.egypt_puzzle_1 ? 'completed' : 'available';
@@ -76,40 +203,108 @@ export const PixelOverworldMap: React.FC<PixelOverworldMapProps> = ({
     return 'locked';
   };
 
-  // Node Click Handlers
-  const handleNodeClick = (node: LocationTarget) => {
+  const getNodeStatus = (nodeId: string): 'available' | 'completed' | 'locked' => {
+    switch (nodeId) {
+      case 'india_puzzle_1': return getIndiaPuzzle1Status();
+      case 'india_puzzle_2': return getIndiaPuzzle2Status();
+      case 'india_mechanism': return getIndiaMechanismStatus();
+      case 'japan_puzzle_1': return getJapanPuzzle1Status();
+      case 'japan_puzzle_2': return getJapanPuzzle2Status();
+      case 'japan_mechanism': return getJapanMechanismStatus();
+      case 'egypt_puzzle_1': return getEgyptPuzzle1Status();
+      case 'egypt_puzzle_2': return getEgyptPuzzle2Status();
+      case 'egypt_mechanism': return getEgyptMechanismStatus();
+      default: return 'locked';
+    }
+  };
+
+  const buildLocationTarget = (nodeId: string): LocationTarget => {
+    const node = MAP_NODES[nodeId];
+    const civ = CIVILIZATIONS[node.civId];
+    const status = getNodeStatus(nodeId);
+
+    if (node.type === 'puzzle') {
+      const pInfo = civ.puzzles.find(p => p.id === node.id)!;
+      let lockReason: string | undefined;
+      if (status === 'locked') {
+        if (node.civId === 'japan') lockReason = 'Unlock India’s Chakra of Balance mechanism first.';
+        if (node.civId === 'egypt') lockReason = 'Unlock Japan’s Shrine of Memories mechanism first.';
+      }
+      return {
+        type: 'puzzle',
+        civId: node.civId,
+        id: node.id as PuzzleId,
+        name: pInfo.name,
+        description: pInfo.description,
+        status,
+        lockReason,
+        rewardName: pInfo.reward.name,
+        rewardIcon: pInfo.reward.icon,
+        rewardDesc: pInfo.reward.description,
+        riddle: pInfo.riddle,
+      };
+    } else {
+      const mInfo = civ.mechanism;
+      let lockReason: string | undefined;
+      if (status === 'locked') {
+        if (node.civId === 'japan' && !isJapanUnlocked) {
+          lockReason = 'Unlock India’s Chakra of Balance first.';
+        } else if (node.civId === 'egypt' && !isEgyptUnlocked) {
+          lockReason = 'Unlock Japan’s Shrine of Memories first.';
+        } else {
+          lockReason = `Solve both chambers in ${civ.name} to activate this mechanism.`;
+        }
+      }
+      return {
+        type: 'mechanism',
+        civId: node.civId,
+        id: node.id as MechanismId,
+        name: mInfo.name,
+        description: mInfo.description,
+        status,
+        lockReason,
+        rewardName: mInfo.fragmentReward.name,
+        rewardIcon: '💎',
+        rewardDesc: mInfo.fragmentReward.description,
+      };
+    }
+  };
+
+  const handleNodeClick = (nodeId: string) => {
     soundManager.playClick(state.soundEnabled);
-    onSelectLocation(node);
+    const target = buildLocationTarget(nodeId);
+    onSelectLocation(target);
   };
 
-  // Location nodes dictionary for coordinate anchoring
-  const locationCoords: Record<string, { x: number; y: number }> = {
-    // Egypt (West)
-    egypt_puzzle_1: { x: 140, y: 470 },
-    egypt_puzzle_2: { x: 280, y: 530 },
-    egypt_mechanism: { x: 210, y: 320 },
-    // India (Center)
-    india_puzzle_1: { x: 500, y: 470 },
-    india_puzzle_2: { x: 690, y: 470 },
-    india_mechanism: { x: 595, y: 280 },
-    // Japan (East)
-    japan_puzzle_1: { x: 910, y: 390 },
-    japan_puzzle_2: { x: 1060, y: 350 },
-    japan_mechanism: { x: 990, y: 190 },
+  const handleCivClick = (civId: CivilizationId) => {
+    soundManager.playClick(state.soundEnabled);
+    if (civId === 'japan' && !isJapanUnlocked) {
+      soundManager.playCancel(state.soundEnabled);
+      return;
+    }
+    if (civId === 'egypt' && !isEgyptUnlocked) {
+      soundManager.playCancel(state.soundEnabled);
+      return;
+    }
+    if (onSelectCivilization) {
+      onSelectCivilization(civId);
+    } else {
+      selectCivilization(civId);
+    }
   };
 
-  // Determine active player marker position
+  // Determine active player position
   const activeLocId = activeLocationId || 'india_puzzle_1';
-  const playerPos = locationCoords[activeLocId] || { x: 500, y: 470 };
+  const playerPos = MAP_NODES[activeLocId] || { x: 160, y: 520 };
 
   // Calculate direction angle when traveling between nodes
   useEffect(() => {
-    const nextPos = locationCoords[activeLocId] || { x: 500, y: 470 };
+    const nextPos = MAP_NODES[activeLocId] || { x: 160, y: 520 };
     const dx = nextPos.x - prevPos.x;
     const dy = nextPos.y - prevPos.y;
 
     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-      const angle = (Math.atan2(dy, dx) * 180) / Math.PI; // -180 to 180
+      const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
       let dir: SpriteDirection = 'south';
       if (angle >= -22.5 && angle < 22.5) dir = 'east';
       else if (angle >= 22.5 && angle < 67.5) dir = 'south-east';
@@ -125,850 +320,511 @@ export const PixelOverworldMap: React.FC<PixelOverworldMapProps> = ({
     }
   }, [activeLocId, prevPos.x, prevPos.y]);
 
+  const activeInspectNode = hoveredNodeId ? MAP_NODES[hoveredNodeId] : MAP_NODES[activeLocId];
+  const activeInspectStatus = activeInspectNode ? getNodeStatus(activeInspectNode.id) : 'available';
+
   return (
-    <div className="relative w-full aspect-[16/9] max-h-[72vh] min-h-[420px] bg-[#0c0d12] border-4 border-amber-800/90 shadow-[0_0_35px_rgba(0,0,0,0.9)] overflow-hidden select-none">
-      {/* SVG Overworld World Map Canvas */}
-      <svg
-        viewBox="0 0 1200 680"
-        className="w-full h-full block"
+    <div className="relative w-full aspect-[16/9] max-h-[85vh] min-h-[500px] bg-black border-4 border-amber-600 shadow-[0_0_50px_rgba(0,0,0,0.98),0_0_20px_rgba(217,119,6,0.3)] overflow-hidden select-none">
+      {/* 1. Authentic Overworld Map Image (Crisp pixelated rendering) */}
+      <img
+        src="/assets/aistudio/The_Lost_Artifact_World_Map_123794b3.png"
+        alt="The Lost Artifact Overworld Map"
+        className="w-full h-full object-cover object-center filter saturate-115 contrast-110 pointer-events-none"
         style={{ imageRendering: 'pixelated' }}
+      />
+
+      {/* 2. Pixel scanline mesh overlay for authentic retro arcade feel */}
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#000000_1px,transparent_1px)] [background-size:4px_4px] opacity-25" />
+
+      {/* 3. Interactive SVG Layer with Chunky, High-Visibility Pixel Badges */}
+      <svg
+        viewBox="0 0 1920 1080"
+        className="absolute inset-0 w-full h-full pointer-events-auto"
         preserveAspectRatio="xMidYMid meet"
       >
         <defs>
-          {/* Subtle animated water ripple */}
-          <linearGradient id="oceanGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#081426" />
-            <stop offset="50%" stopColor="#0b1a30" />
-            <stop offset="100%" stopColor="#050e1c" />
-          </linearGradient>
-
-          {/* India Ochre Gradient */}
-          <radialGradient id="indiaGround" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#78350f" />
-            <stop offset="70%" stopColor="#451a03" />
-            <stop offset="100%" stopColor="#1c1917" />
-          </radialGradient>
-
-          {/* Japan Moss Gradient */}
-          <radialGradient id="japanGround" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#064e3b" />
-            <stop offset="70%" stopColor="#022c22" />
-            <stop offset="100%" stopColor="#0f172a" />
-          </radialGradient>
-
-          {/* Egypt Sand Gradient */}
-          <radialGradient id="egyptGround" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#92400e" />
-            <stop offset="70%" stopColor="#713f12" />
-            <stop offset="100%" stopColor="#1c1917" />
-          </radialGradient>
-
-          {/* Glow filter */}
-          <filter id="pixelGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+          {/* Intense pixel glow filters */}
+          <filter id="pixelGlowGold" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id="pixelGlowGreen" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
 
-        {/* 1. Base Ocean / Cosmic Abyss Background */}
-        <rect width="1200" height="680" fill="url(#oceanGrad)" />
+        {/* ======================================================== */}
+        {/* ANIMATED PIXEL DOTTED TRADE ROUTE FLOW                   */}
+        {/* ======================================================== */}
+        {/* India to Egypt Trade Route */}
+        <path
+          d="M 520 720 Q 640 700 750 670 Q 820 650 880 620"
+          fill="none"
+          stroke="#f59e0b"
+          strokeWidth="4"
+          strokeDasharray="8 12"
+          opacity="0.8"
+        >
+          <animate attributeName="stroke-dashoffset" values="40;0" dur="2s" repeatCount="indefinite" />
+        </path>
 
-        {/* Ocean Grid Lines (Ancient Nautical Cartography) */}
-        <g stroke="#1e293b" strokeWidth="1" strokeDasharray="4 8" opacity="0.4">
-          <line x1="0" y1="170" x2="1200" y2="170" />
-          <line x1="0" y1="340" x2="1200" y2="340" />
-          <line x1="0" y1="510" x2="1200" y2="510" />
-          <line x1="300" y1="0" x2="300" y2="680" />
-          <line x1="600" y1="0" x2="600" y2="680" />
-          <line x1="900" y1="0" x2="900" y2="680" />
-        </g>
+        {/* Egypt to Japan Trade Route */}
+        <path
+          d="M 1220 590 Q 1300 630 1400 640 Q 1500 640 1560 550"
+          fill="none"
+          stroke={isJapanUnlocked ? '#38bdf8' : '#52525b'}
+          strokeWidth="4"
+          strokeDasharray="8 12"
+          opacity={isJapanUnlocked ? '0.85' : '0.4'}
+        >
+          {isJapanUnlocked && (
+            <animate attributeName="stroke-dashoffset" values="40;0" dur="2s" repeatCount="indefinite" />
+          )}
+        </path>
 
         {/* ======================================================== */}
-        {/* REGION 1: EGYPT — THE PYRAMID OF SECRETS (West: X: 40-380) */}
+        {/* CIVILIZATION REALM INTERACTIVE BANNERS                   */}
         {/* ======================================================== */}
-        <g id="region-egypt">
-          {/* Desert Landmass */}
-          <path
-            d="M 60 220 Q 200 180 340 240 Q 380 380 360 520 Q 320 640 180 650 Q 50 630 40 450 Z"
-            fill="url(#egyptGround)"
-            stroke="#b45309"
-            strokeWidth="3"
+
+        {/* 1. INDIA BANNER (x: 200-480, y: 740-815) */}
+        <g
+          className="cursor-pointer group"
+          onClick={() => handleCivClick('india')}
+          onMouseEnter={() => setHoveredCivId('india')}
+          onMouseLeave={() => setHoveredCivId(null)}
+        >
+          {/* Black shadow border */}
+          <rect x="204" y="744" width="272" height="68" fill="#000000" rx="4" />
+          {/* Main frame */}
+          <rect
+            x="200"
+            y="740"
+            width="272"
+            height="68"
+            fill="#064e3b"
+            stroke={hoveredCivId === 'india' ? '#34d399' : '#059669'}
+            strokeWidth={hoveredCivId === 'india' ? '4' : '3'}
+            rx="4"
           />
-
-          {/* Sand Dunes Layers (Pixel Art Sand Ribbons) */}
-          <path d="M 70 340 Q 150 310 240 350 Q 320 380 350 340" fill="none" stroke="#d97706" strokeWidth="3" />
-          <path d="M 80 430 Q 180 400 280 450 Q 330 460 350 440" fill="none" stroke="#ca8a04" strokeWidth="2" />
-          <path d="M 60 540 Q 170 510 270 560 Q 310 580 330 550" fill="none" stroke="#d97706" strokeWidth="3" />
-
-          {/* The Nile Turquoise Ribbon */}
-          <path
-            d="M 290 220 Q 310 320 280 420 Q 250 510 290 620"
-            fill="none"
-            stroke="#06b6d4"
-            strokeWidth="8"
-            strokeLinecap="round"
-            opacity="0.85"
-          />
-          <path
-            d="M 290 220 Q 310 320 280 420 Q 250 510 290 620"
-            fill="none"
-            stroke="#bae6fd"
-            strokeWidth="2"
-            strokeDasharray="6 8"
-          />
-
-          {/* Desert Palm Trees */}
-          {[
-            { x: 300, y: 390 },
-            { x: 260, y: 440 },
-            { x: 310, y: 480 },
-            { x: 110, y: 360 },
-          ].map((pt, i) => (
-            <g key={`palm-${i}`}>
-              <rect x={pt.x + 4} y={pt.y + 10} width="3" height="12" fill="#78350f" />
-              <polygon points={`${pt.x + 5},${pt.y + 4} ${pt.x + 12},${pt.y + 12} ${pt.x + 8},${pt.y + 12}`} fill="#15803d" />
-              <polygon points={`${pt.x + 5},${pt.y + 4} ${pt.x - 2},${pt.y + 12} ${pt.x + 2},${pt.y + 12}`} fill="#15803d" />
-              <polygon points={`${pt.x + 5},${pt.y} ${pt.x + 5},${pt.y + 6} ${pt.x + 2},${pt.y + 5}`} fill="#16a34a" />
-            </g>
-          ))}
-
-          {/* Sandstone Obelisk Near Nile */}
-          <polygon points="310,290 314,290 315,340 309,340" fill="#facc15" />
-          <polygon points="312,284 314,290 310,290" fill="#fef08a" />
-          <rect x="307" y="340" width="10" height="4" fill="#a16207" />
-
-          {/* Region Title Label */}
-          <text x="210" y="240" fill="#facc15" fontFamily="'Press Start 2P', monospace" fontSize="11" textAnchor="middle">
-            EGYPT
+          {/* Inner bevel */}
+          <rect x="204" y="744" width="264" height="60" fill="none" stroke="#10b981" strokeWidth="1" strokeDasharray="6 4" opacity="0.6" />
+          {/* Text Lockup */}
+          <text x="245" y="782" fill="#34d399" fontFamily="'Press Start 2P', monospace" fontSize="22">
+            ☸
           </text>
-          <text x="210" y="258" fill="#fef08a" fontFamily="'Silkscreen', monospace" fontSize="9" textAnchor="middle" opacity="0.8">
-            The Pyramid of Secrets
-          </text>
-        </g>
-
-        {/* ======================================================== */}
-        {/* REGION 2: INDIA — THE CHAKRA OF BALANCE (Center: X: 420-780) */}
-        {/* ======================================================== */}
-        <g id="region-india">
-          {/* Ochre Terracotta Landmass */}
-          <path
-            d="M 440 210 Q 600 170 760 210 Q 790 360 770 520 Q 720 630 600 640 Q 450 630 430 470 Z"
-            fill="url(#indiaGround)"
-            stroke="#d97706"
-            strokeWidth="3"
-          />
-
-          {/* Carved Mandala Paving Floor Rings */}
-          <circle cx="595" cy="400" r="130" fill="none" stroke="#92400e" strokeWidth="2" strokeDasharray="8 6" opacity="0.6" />
-          <circle cx="595" cy="400" r="85" fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="6 4" opacity="0.7" />
-
-          {/* Stepped Water Tank (Baoli Stepwell) */}
-          <rect x="555" y="380" width="80" height="40" fill="#0369a1" stroke="#92400e" strokeWidth="4" />
-          <rect x="563" y="386" width="64" height="28" fill="#0284c7" />
-          <rect x="571" y="392" width="48" height="16" fill="#38bdf8" />
-          {/* Animated Water Sparkles */}
-          <rect x="585" y="396" width="4" height="2" fill="#ffffff" opacity="0.8">
-            <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite" />
-          </rect>
-          <rect x="600" y="402" width="4" height="2" fill="#ffffff" opacity="0.6">
-            <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1.8s" repeatCount="indefinite" />
-          </rect>
-
-          {/* Terracotta Shikhara Temple Spires */}
-          <g transform="translate(470, 240)">
-            <rect x="0" y="20" width="28" height="24" fill="#92400e" />
-            <polygon points="14,0 28,20 0,20" fill="#b45309" />
-            <polygon points="14,4 24,20 4,20" fill="#d97706" />
-            <rect x="13" y="-4" width="2" height="6" fill="#facc15" />
-            <rect x="8" y="32" width="12" height="12" fill="#1c1917" />
-          </g>
-
-          <g transform="translate(700, 240)">
-            <rect x="0" y="20" width="28" height="24" fill="#92400e" />
-            <polygon points="14,0 28,20 0,20" fill="#b45309" />
-            <polygon points="14,4 24,20 4,20" fill="#d97706" />
-            <rect x="13" y="-4" width="2" height="6" fill="#facc15" />
-            <rect x="8" y="32" width="12" height="12" fill="#1c1917" />
-          </g>
-
-          {/* Sacred Banyan Tree */}
-          <g transform="translate(450, 360)">
-            <rect x="12" y="14" width="6" height="20" fill="#78350f" />
-            <circle cx="15" cy="12" r="14" fill="#15803d" />
-            <circle cx="22" cy="8" r="10" fill="#16a34a" />
-            <circle cx="8" cy="8" r="10" fill="#15803d" />
-          </g>
-
-          {/* Region Title Label */}
-          <text x="595" y="200" fill="#fbbf24" fontFamily="'Press Start 2P', monospace" fontSize="11" textAnchor="middle">
+          <text x="350" y="776" fill="#fef08a" fontFamily="'Press Start 2P', monospace" fontSize="18" textAnchor="middle" fontWeight="bold">
             INDIA
           </text>
-          <text x="595" y="218" fill="#fde68a" fontFamily="'Silkscreen', monospace" fontSize="9" textAnchor="middle" opacity="0.8">
-            The Chakra of Balance
+          <text x="350" y="798" fill="#a7f3d0" fontFamily="'Silkscreen', monospace" fontSize="11" textAnchor="middle">
+            {state.unlockedMechanisms.india_mechanism ? '★ VAULT RECOVERED' : '✦ STEPWELL SANCTUARY'}
           </text>
         </g>
 
-        {/* ======================================================== */}
-        {/* REGION 3: JAPAN — THE SHRINE OF MEMORIES (East: X: 820-1160) */}
-        {/* ======================================================== */}
-        <g id="region-japan">
-          {/* Moss Green Archipelago Islands */}
-          <path
-            d="M 830 200 Q 980 100 1120 180 Q 1160 320 1130 460 Q 1060 560 920 540 Q 820 470 820 320 Z"
-            fill="url(#japanGround)"
-            stroke="#059669"
-            strokeWidth="3"
+        {/* 2. EGYPT BANNER (x: 820-1100, y: 700-775) */}
+        <g
+          className={`cursor-pointer group ${!isEgyptUnlocked ? 'opacity-90' : ''}`}
+          onClick={() => handleCivClick('egypt')}
+          onMouseEnter={() => setHoveredCivId('egypt')}
+          onMouseLeave={() => setHoveredCivId(null)}
+        >
+          <rect x="824" y="704" width="272" height="68" fill="#000000" rx="4" />
+          <rect
+            x="820"
+            y="700"
+            width="272"
+            height="68"
+            fill={isEgyptUnlocked ? '#78350f' : '#18181b'}
+            stroke={isEgyptUnlocked ? (hoveredCivId === 'egypt' ? '#fde047' : '#f59e0b') : '#52525b'}
+            strokeWidth={hoveredCivId === 'egypt' ? '4' : '3'}
+            rx="4"
           />
+          <rect x="824" y="704" width="264" height="60" fill="none" stroke={isEgyptUnlocked ? '#fbbf24' : '#3f3f46'} strokeWidth="1" strokeDasharray="6 4" opacity="0.6" />
+          <text x="865" y="742" fill={isEgyptUnlocked ? '#fde047' : '#71717a'} fontFamily="'Press Start 2P', monospace" fontSize="22">
+            ☥
+          </text>
+          <text x="970" y="736" fill={isEgyptUnlocked ? '#fef08a' : '#a1a1aa'} fontFamily="'Press Start 2P', monospace" fontSize="18" textAnchor="middle" fontWeight="bold">
+            EGYPT
+          </text>
+          <text x="970" y="758" fill={isEgyptUnlocked ? '#fde68a' : '#71717a'} fontFamily="'Silkscreen', monospace" fontSize="11" textAnchor="middle">
+            {state.unlockedMechanisms.egypt_mechanism ? '★ VAULT RECOVERED' : isEgyptUnlocked ? '✦ PYRAMID OF SECRETS' : '🔒 UNLOCK JAPAN FIRST'}
+          </text>
+        </g>
 
-          {/* Koi Pond with Stone Garden Trim */}
-          <path
-            d="M 960 300 Q 1020 280 1060 310 Q 1070 360 1010 370 Q 950 360 960 300 Z"
-            fill="#0f766e"
-            stroke="#475569"
-            strokeWidth="3"
+        {/* 3. JAPAN BANNER (x: 1470-1750, y: 740-815) */}
+        <g
+          className={`cursor-pointer group ${!isJapanUnlocked ? 'opacity-90' : ''}`}
+          onClick={() => handleCivClick('japan')}
+          onMouseEnter={() => setHoveredCivId('japan')}
+          onMouseLeave={() => setHoveredCivId(null)}
+        >
+          <rect x="1474" y="744" width="272" height="68" fill="#000000" rx="4" />
+          <rect
+            x="1470"
+            y="740"
+            width="272"
+            height="68"
+            fill={isJapanUnlocked ? '#1e1b4b' : '#18181b'}
+            stroke={isJapanUnlocked ? (hoveredCivId === 'japan' ? '#38bdf8' : '#0284c7') : '#52525b'}
+            strokeWidth={hoveredCivId === 'japan' ? '4' : '3'}
+            rx="4"
           />
-          {/* Wooden Arched Bridge across Pond */}
-          <path d="M 970 330 Q 1010 315 1050 330" fill="none" stroke="#92400e" strokeWidth="6" strokeLinecap="round" />
-          <path d="M 972 328 Q 1010 314 1048 328" fill="none" stroke="#dc2626" strokeWidth="2" />
-
-          {/* Cherry Blossom Trees (Muted Pink with Falling Petals) */}
-          {[
-            { x: 860, y: 260 },
-            { x: 1080, y: 220 },
-            { x: 860, y: 450 },
-            { x: 1110, y: 410 },
-          ].map((tree, i) => (
-            <g key={`sakura-${i}`}>
-              <rect x={tree.x + 8} y={tree.y + 14} width="4" height="16" fill="#78350f" />
-              <circle cx={tree.x + 10} cy={tree.y + 10} r="14" fill="#f472b6" opacity="0.9" />
-              <circle cx={tree.x + 16} cy={tree.y + 4} r="11" fill="#fbcfe8" opacity="0.95" />
-              <circle cx={tree.x + 4} cy={tree.y + 6} r="10" fill="#f472b6" opacity="0.9" />
-              {/* Drifting Petal */}
-              <circle cx={tree.x + 20} cy={tree.y + 20} r="2" fill="#fbcfe8">
-                <animate attributeName="cy" values={`${tree.y + 20};${tree.y + 36}`} dur="3s" repeatCount="indefinite" />
-                <animate attributeName="cx" values={`${tree.x + 20};${tree.x + 26}`} dur="3s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="1;0" dur="3s" repeatCount="indefinite" />
-              </circle>
-            </g>
-          ))}
-
-          {/* Stone Lanterns (Toro) with glowing candles */}
-          {[
-            { x: 920, y: 280 },
-            { x: 1040, y: 260 },
-          ].map((lantern, idx) => (
-            <g key={`lantern-${idx}`}>
-              <rect x={lantern.x + 2} y={lantern.y + 6} width="6" height="8" fill="#64748b" />
-              <rect x={lantern.x} y={lantern.y + 4} width="10" height="3" fill="#94a3b8" />
-              <rect x={lantern.x + 3} y={lantern.y + 7} width="4" height="4" fill="#fef08a">
-                <animate attributeName="opacity" values="0.7;1;0.7" dur="1.2s" repeatCount="indefinite" />
-              </rect>
-            </g>
-          ))}
-
-          {/* Region Title Label */}
-          <text x="990" y="110" fill="#38bdf8" fontFamily="'Press Start 2P', monospace" fontSize="11" textAnchor="middle">
+          <rect x="1474" y="744" width="264" height="60" fill="none" stroke={isJapanUnlocked ? '#38bdf8' : '#3f3f46'} strokeWidth="1" strokeDasharray="6 4" opacity="0.6" />
+          <text x="1515" y="782" fill={isJapanUnlocked ? '#f87171' : '#71717a'} fontFamily="'Press Start 2P', monospace" fontSize="22">
+            ⛩
+          </text>
+          <text x="1620" y="776" fill={isJapanUnlocked ? '#e0f2fe' : '#a1a1aa'} fontFamily="'Press Start 2P', monospace" fontSize="18" textAnchor="middle" fontWeight="bold">
             JAPAN
           </text>
-          <text x="990" y="128" fill="#bae6fd" fontFamily="'Silkscreen', monospace" fontSize="9" textAnchor="middle" opacity="0.8">
-            The Shrine of Memories
+          <text x="1620" y="798" fill={isJapanUnlocked ? '#bae6fd' : '#71717a'} fontFamily="'Silkscreen', monospace" fontSize="11" textAnchor="middle">
+            {state.unlockedMechanisms.japan_mechanism ? '★ VAULT RECOVERED' : isJapanUnlocked ? '✦ SHRINE OF MEMORIES' : '🔒 UNLOCK INDIA FIRST'}
           </text>
         </g>
 
         {/* ======================================================== */}
-        {/* THE WINDING ANCIENT TRADE ROUTE (Cobblestones & Caravan) */}
+        {/* ROUTE LOCK MILESTONES (High-Contrast Chunky Badges)      */}
         {/* ======================================================== */}
-        <g id="trade-routes">
-          {/* Western Route: Egypt to India */}
-          <path
-            d="M 220 340 Q 320 370 380 430 Q 420 480 490 470"
-            fill="none"
-            stroke="#52525b"
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray="10 6"
-          />
-          <path
-            d="M 220 340 Q 320 370 380 430 Q 420 480 490 470"
-            fill="none"
-            stroke="#fbbf24"
-            strokeWidth="2"
-            strokeDasharray="6 8"
-            opacity={isEgyptUnlocked ? 0.9 : 0.3}
-          />
 
-          {/* Internal India Route: Courtyard to Mechanism & Hearths */}
-          <path
-            d="M 500 460 Q 550 430 595 320"
-            fill="none"
-            stroke="#78350f"
-            strokeWidth="6"
-            strokeDasharray="8 6"
-          />
-          <path
-            d="M 690 460 Q 640 430 595 320"
-            fill="none"
-            stroke="#78350f"
-            strokeWidth="6"
-            strokeDasharray="8 6"
-          />
-
-          {/* Eastern Route: India to Japan across archipelago bridge */}
-          <path
-            d="M 610 280 Q 720 250 780 320 Q 820 360 890 380"
-            fill="none"
-            stroke="#52525b"
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray="10 6"
-          />
-          <path
-            d="M 610 280 Q 720 250 780 320 Q 820 360 890 380"
-            fill="none"
-            stroke="#38bdf8"
-            strokeWidth="2"
-            strokeDasharray="6 8"
-            opacity={isJapanUnlocked ? 0.9 : 0.3}
-          />
-
-          {/* Internal Japan Route */}
-          <path
-            d="M 910 380 Q 940 320 985 230"
-            fill="none"
-            stroke="#065f46"
-            strokeWidth="6"
-            strokeDasharray="8 6"
-          />
-          <path
-            d="M 1060 340 Q 1020 300 985 230"
-            fill="none"
-            stroke="#065f46"
-            strokeWidth="6"
-            strokeDasharray="8 6"
-          />
+        {/* Route milestone between India and Egypt (x: 720, y: 685) */}
+        <g transform="translate(720, 685)" className="pointer-events-none">
+          <circle cx="0" cy="0" r="22" fill="#000000" stroke="#f59e0b" strokeWidth="3" />
+          <circle cx="0" cy="0" r="17" fill={isEgyptUnlocked ? '#065f46' : '#27272a'} />
+          <text x="0" y="6" fill="#ffffff" fontFamily="'Press Start 2P', monospace" fontSize="12" textAnchor="middle">
+            {isEgyptUnlocked ? '✓' : '🔒'}
+          </text>
+          <rect x="-45" y="26" width="90" height="18" fill="#09090b" stroke="#52525b" strokeWidth="1.5" rx="3" />
+          <text x="0" y="38" fill={isEgyptUnlocked ? '#34d399' : '#a1a1aa'} fontFamily="'Silkscreen', monospace" fontSize="8" textAnchor="middle">
+            {isEgyptUnlocked ? 'ROUTE OPEN' : 'SEALED'}
+          </text>
         </g>
 
-        {/* ======================================================== */}
-        {/* VISUAL LOCKS ON LOCKED REGIONS */}
-        {/* ======================================================== */}
-        {/* Japan Spiritual Fog Lock */}
-        {!isJapanUnlocked && (
-          <g id="japan-lock-barrier" opacity="0.9">
-            <rect x="800" y="80" width="370" height="500" fill="#030712" opacity="0.65" />
-            <g transform="translate(820, 310)">
-              <circle cx="16" cy="16" r="22" fill="#18181b" stroke="#dc2626" strokeWidth="3" />
-              <rect x="10" y="14" width="12" height="10" fill="#dc2626" />
-              <path d="M 12 14 Q 16 8 20 14" fill="none" stroke="#dc2626" strokeWidth="2.5" />
-              <text x="16" y="50" fill="#f87171" fontFamily="'Press Start 2P', monospace" fontSize="8" textAnchor="middle">
-                SEALED PASSAGE
+        {/* Route milestone between Egypt and Japan (x: 1295, y: 625) */}
+        <g transform="translate(1295, 625)" className="pointer-events-none">
+          <circle cx="0" cy="0" r="22" fill="#000000" stroke="#38bdf8" strokeWidth="3" />
+          <circle cx="0" cy="0" r="17" fill={isJapanUnlocked ? '#065f46' : '#27272a'} />
+          <text x="0" y="6" fill="#ffffff" fontFamily="'Press Start 2P', monospace" fontSize="12" textAnchor="middle">
+            {isJapanUnlocked ? '✓' : '🔒'}
+          </text>
+          <rect x="-45" y="26" width="90" height="18" fill="#09090b" stroke="#52525b" strokeWidth="1.5" rx="3" />
+          <text x="0" y="38" fill={isJapanUnlocked ? '#34d399' : '#a1a1aa'} fontFamily="'Silkscreen', monospace" fontSize="8" textAnchor="middle">
+            {isJapanUnlocked ? 'ROUTE OPEN' : 'SEALED'}
+          </text>
+        </g>
+
+        {/* Bottom Center Reassembly Sanctum Altar Node (x: 1040, y: 835) */}
+        <g
+          transform="translate(1040, 835)"
+          className="cursor-pointer group"
+          onClick={() => {
+            soundManager.playClick(state.soundEnabled);
+            goToScreen('ASSEMBLY');
+          }}
+        >
+          {allFragmentsRecovered ? (
+            <>
+              {/* Pulsing Beacon Halo */}
+              <circle cx="0" cy="0" r="32" fill="none" stroke="#fde047" strokeWidth="4" filter="url(#pixelGlowGold)">
+                <animate attributeName="r" values="28;42;28" dur="1.2s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite" />
+              </circle>
+              {/* Altar base */}
+              <rect x="-35" y="-20" width="70" height="40" fill="#000000" rx="4" />
+              <rect x="-32" y="-18" width="64" height="36" fill="#78350f" stroke="#facc15" strokeWidth="3" rx="3" />
+              <text x="0" y="6" fill="#fef08a" fontFamily="'Press Start 2P', monospace" fontSize="18" textAnchor="middle">
+                ✦
               </text>
-            </g>
-          </g>
-        )}
-
-        {/* Egypt Sandstorm Lock */}
-        {!isEgyptUnlocked && (
-          <g id="egypt-lock-barrier" opacity="0.9">
-            <rect x="30" y="160" width="370" height="510" fill="#030712" opacity="0.65" />
-            <g transform="translate(350, 400)">
-              <circle cx="16" cy="16" r="22" fill="#18181b" stroke="#dc2626" strokeWidth="3" />
-              <rect x="10" y="14" width="12" height="10" fill="#dc2626" />
-              <path d="M 12 14 Q 16 8 20 14" fill="none" stroke="#dc2626" strokeWidth="2.5" />
-              <text x="16" y="50" fill="#f87171" fontFamily="'Press Start 2P', monospace" fontSize="8" textAnchor="middle">
-                SEALED CARAVAN
+              {/* Name Tag */}
+              <rect x="-100" y="24" width="200" height="26" fill="#000000" stroke="#facc15" strokeWidth="2" rx="4" />
+              <text x="0" y="41" fill="#fde047" fontFamily="'Press Start 2P', monospace" fontSize="9" textAnchor="middle" fontWeight="bold">
+                UNITE THE LOST ARTIFACT
               </text>
+            </>
+          ) : (
+            <>
+              <circle cx="0" cy="0" r="26" fill="#000000" stroke="#52525b" strokeWidth="3" />
+              <circle cx="0" cy="0" r="20" fill="#18181b" />
+              <text x="0" y="6" fill="#eab308" fontFamily="'Press Start 2P', monospace" fontSize="14" textAnchor="middle">
+                △
+              </text>
+              <rect x="-80" y="30" width="160" height="22" fill="#09090b" stroke="#52525b" strokeWidth="1.5" rx="3" />
+              <text x="0" y="45" fill="#fde047" fontFamily="'Silkscreen', monospace" fontSize="10" textAnchor="middle">
+                SANCTUM: {fragmentsCount}/3 KEYSTONES
+              </text>
+            </>
+          )}
+        </g>
+
+        {/* ======================================================== */}
+        {/* CHUNKY HIGH-VISIBILITY PIXEL-ART PUZZLE & MECHANISM NODES */}
+        {/* ======================================================== */}
+        {Object.entries(MAP_NODES).map(([nodeId, node]) => {
+          const status = getNodeStatus(nodeId);
+          const isSelected = activeLocationId === nodeId;
+          const isHovered = hoveredNodeId === nodeId;
+          const isMechanism = node.type === 'mechanism';
+
+          // Color themes based on state
+          const badgeTheme = {
+            completed: {
+              main: '#059669',
+              border: '#34d399',
+              accent: '#a7f3d0',
+              text: '#ffffff',
+              glow: 'pixelGlowGreen',
+              label: 'CLEARED',
+            },
+            available: {
+              main: isMechanism ? '#b45309' : '#d97706',
+              border: isMechanism ? '#fde047' : '#fbbf24',
+              accent: '#fef08a',
+              text: '#ffffff',
+              glow: 'pixelGlowGold',
+              label: isMechanism ? 'READY' : 'ACTIVE',
+            },
+            locked: {
+              main: '#18181b',
+              border: '#52525b',
+              accent: '#71717a',
+              text: '#a1a1aa',
+              glow: '',
+              label: 'LOCKED',
+            },
+          }[status];
+
+          return (
+            <g
+              key={nodeId}
+              transform={`translate(${node.x}, ${node.y})`}
+              className="cursor-pointer group"
+              onClick={() => handleNodeClick(nodeId)}
+              onMouseEnter={() => setHoveredNodeId(nodeId)}
+              onMouseLeave={() => setHoveredNodeId(null)}
+            >
+              {/* 1. Pulsing Concentric Reticle for Available Nodes */}
+              {status === 'available' && (
+                <circle cx="0" cy="0" r={isMechanism ? 38 : 28} fill="none" stroke={badgeTheme.border} strokeWidth="3" opacity="0.8">
+                  <animate attributeName="r" values={isMechanism ? '32;46;32' : '24;36;24'} dur="1.2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="1;0.2;1" dur="1.2s" repeatCount="indefinite" />
+                </circle>
+              )}
+
+              {/* 2. Drop Shadow Under Badge */}
+              <rect
+                x={isMechanism ? -32 : -25}
+                y={isMechanism ? -32 : -25}
+                width={isMechanism ? 64 : 50}
+                height={isMechanism ? 64 : 50}
+                fill="#000000"
+                rx={isMechanism ? 12 : 6}
+                transform="translate(4, 4)"
+              />
+
+              {/* 3. Main Chunky Badge Body */}
+              <rect
+                x={isMechanism ? -32 : -25}
+                y={isMechanism ? -32 : -25}
+                width={isMechanism ? 64 : 50}
+                height={isMechanism ? 64 : 50}
+                fill={badgeTheme.main}
+                stroke={isSelected || isHovered ? '#ffffff' : badgeTheme.border}
+                strokeWidth={isSelected || isHovered ? '4' : '3'}
+                rx={isMechanism ? 12 : 6}
+                filter={isSelected || isHovered ? `url(#${badgeTheme.glow})` : undefined}
+              />
+
+              {/* Inner 3D Highlight Border */}
+              <rect
+                x={isMechanism ? -29 : -22}
+                y={isMechanism ? -29 : -22}
+                width={isMechanism ? 58 : 44}
+                height={isMechanism ? 58 : 44}
+                fill="none"
+                stroke={badgeTheme.accent}
+                strokeWidth="1.5"
+                rx={isMechanism ? 9 : 4}
+                opacity="0.8"
+              />
+
+              {/* Central Iconic Graphic */}
+              <text
+                x="0"
+                y={isMechanism ? '9' : '7'}
+                fill={badgeTheme.text}
+                fontFamily="'Press Start 2P', monospace"
+                fontSize={isMechanism ? '20' : '16'}
+                textAnchor="middle"
+                fontWeight="bold"
+              >
+                {status === 'completed' ? '✓' : status === 'locked' ? '🔒' : node.relicIcon}
+              </text>
+
+              {/* Chamber Number Tag (Below Icon) */}
+              <g transform="translate(0, 36)">
+                {/* Tag Shadow */}
+                <rect x="-56" y="2" width="112" height="20" fill="#000000" rx="3" />
+                {/* Tag Body */}
+                <rect
+                  x="-58"
+                  y="0"
+                  width="116"
+                  height="20"
+                  fill="#09090b"
+                  stroke={isSelected || isHovered ? '#ffffff' : badgeTheme.border}
+                  strokeWidth="2"
+                  rx="3"
+                />
+                <text
+                  x="0"
+                  y="14"
+                  fill={badgeTheme.accent}
+                  fontFamily="'Press Start 2P', monospace"
+                  fontSize="7"
+                  textAnchor="middle"
+                >
+                  {node.chamberNum}
+                </text>
+              </g>
+
+              {/* Persistent/Hover Name Header Pill (Above Icon) */}
+              <g transform="translate(0, -42)">
+                <rect x="-80" y="2" width="160" height="24" fill="#000000" rx="4" />
+                <rect
+                  x="-82"
+                  y="0"
+                  width="164"
+                  height="24"
+                  fill="#09090b"
+                  stroke={isSelected || isHovered ? '#ffffff' : badgeTheme.border}
+                  strokeWidth="2"
+                  rx="4"
+                />
+                <text
+                  x="0"
+                  y="16"
+                  fill={status === 'completed' ? '#34d399' : status === 'available' ? '#fde047' : '#d4d4d8'}
+                  fontFamily="'Silkscreen', monospace"
+                  fontSize="9"
+                  fontWeight="bold"
+                  textAnchor="middle"
+                >
+                  {node.name.toUpperCase()}
+                </text>
+              </g>
+
+              {/* Status Ribbon Pill */}
+              <g transform="translate(0, -18)">
+                <rect
+                  x="-32"
+                  y="0"
+                  width="64"
+                  height="14"
+                  fill={status === 'completed' ? '#065f46' : status === 'available' ? '#b45309' : '#27272a'}
+                  stroke={badgeTheme.border}
+                  strokeWidth="1"
+                  rx="2"
+                />
+                <text
+                  x="0"
+                  y="10"
+                  fill="#ffffff"
+                  fontFamily="'Press Start 2P', monospace"
+                  fontSize="6"
+                  textAnchor="middle"
+                >
+                  {badgeTheme.label}
+                </text>
+              </g>
+
+              {/* Bouncing Pointer Arrow on Selected Node */}
+              {isSelected && (
+                <g transform="translate(0, -75)">
+                  <polygon points="-8,-12 8,-12 0,0" fill="#fde047" stroke="#000000" strokeWidth="2">
+                    <animateTransform attributeName="transform" type="translate" values="0,0; 0,-8; 0,0" dur="0.8s" repeatCount="indefinite" />
+                  </polygon>
+                </g>
+              )}
             </g>
-          </g>
-        )}
+          );
+        })}
 
         {/* ======================================================== */}
-        {/* INTERACTIVE CLICKABLE LOCATIONS (9 Landmarks) */}
-        {/* ======================================================== */}
-
-        {/* --- INDIA 1: The Cracked Courtyard --- */}
-        <g
-          id="node-india-puzzle-1"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'puzzle',
-              civId: 'india',
-              id: 'india_puzzle_1',
-              name: 'The Cracked Courtyard',
-              description: CIVILIZATIONS.india.puzzles[0].description,
-              riddle: CIVILIZATIONS.india.puzzles[0].riddle,
-              status: getIndiaPuzzle1Status(),
-              rewardName: CIVILIZATIONS.india.puzzles[0].reward.name,
-              rewardIcon: CIVILIZATIONS.india.puzzles[0].reward.icon,
-              rewardDesc: CIVILIZATIONS.india.puzzles[0].reward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('india_puzzle_1')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Fractured Mandala Paving Stone */}
-          <g transform="translate(480, 440)">
-            <rect x="0" y="0" width="40" height="30" fill="#78350f" stroke="#b45309" strokeWidth="2" />
-            <line x1="8" y1="0" x2="32" y2="30" stroke="#f59e0b" strokeWidth="2" />
-            <line x1="0" y1="16" x2="40" y2="14" stroke="#f59e0b" strokeWidth="2" />
-            <circle cx="20" cy="15" r="5" fill="#facc15" />
-          </g>
-          {/* Status Pin */}
-          <LocationPin
-            x={500}
-            y={430}
-            status={getIndiaPuzzle1Status()}
-            isHovered={hoveredNodeId === 'india_puzzle_1'}
-            label="Cracked Courtyard"
-          />
-        </g>
-
-        {/* --- INDIA 2: The Five Hearths --- */}
-        <g
-          id="node-india-puzzle-2"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'puzzle',
-              civId: 'india',
-              id: 'india_puzzle_2',
-              name: 'The Five Hearths',
-              description: CIVILIZATIONS.india.puzzles[1].description,
-              riddle: CIVILIZATIONS.india.puzzles[1].riddle,
-              status: getIndiaPuzzle2Status(),
-              rewardName: CIVILIZATIONS.india.puzzles[1].reward.name,
-              rewardIcon: CIVILIZATIONS.india.puzzles[1].reward.icon,
-              rewardDesc: CIVILIZATIONS.india.puzzles[1].reward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('india_puzzle_2')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Stepped Sacrificial Fire Braziers */}
-          <g transform="translate(670, 440)">
-            <rect x="0" y="10" width="40" height="20" fill="#78350f" stroke="#b45309" strokeWidth="2" />
-            {/* 3 Visible flame braziers */}
-            <rect x="4" y="6" width="8" height="6" fill="#ea580c" />
-            <polygon points="8,0 12,6 4,6" fill="#fef08a" />
-            <rect x="16" y="6" width="8" height="6" fill="#ea580c" />
-            <polygon points="20,0 24,6 16,6" fill="#fef08a" />
-            <rect x="28" y="6" width="8" height="6" fill="#ea580c" />
-            <polygon points="32,0 36,6 28,6" fill="#fef08a" />
-          </g>
-          {/* Status Pin */}
-          <LocationPin
-            x={690}
-            y={430}
-            status={getIndiaPuzzle2Status()}
-            isHovered={hoveredNodeId === 'india_puzzle_2'}
-            label="The Five Hearths"
-          />
-        </g>
-
-        {/* --- INDIA MECHANISM: The Chakra of Balance --- */}
-        <g
-          id="node-india-mechanism"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'mechanism',
-              civId: 'india',
-              id: 'india_mechanism',
-              name: 'The Chakra of Balance',
-              description: CIVILIZATIONS.india.mechanism.description,
-              status: getIndiaMechanismStatus(),
-              lockReason: 'Complete both "The Cracked Courtyard" and "The Five Hearths" to align the Chakra mechanism.',
-              rewardName: CIVILIZATIONS.india.mechanism.fragmentReward.name,
-              rewardDesc: CIVILIZATIONS.india.mechanism.fragmentReward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('india_mechanism')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Grand Golden Chakra Astrolabe */}
-          <g transform="translate(565, 250)">
-            <rect x="0" y="44" width="60" height="16" fill="#292524" stroke="#78350f" strokeWidth="2" />
-            <circle cx="30" cy="24" r="22" fill="#92400e" stroke="#fbbf24" strokeWidth="3" />
-            <circle cx="30" cy="24" r="14" fill="#d97706" />
-            {/* Rotating spoke illusion */}
-            <line x1="30" y1="4" x2="30" y2="44" stroke="#fef08a" strokeWidth="2.5" />
-            <line x1="10" y1="24" x2="50" y2="24" stroke="#fef08a" strokeWidth="2.5" />
-            <circle cx="30" cy="24" r="5" fill="#fef08a" />
-          </g>
-          <MechanismPin
-            x={595}
-            y={240}
-            status={getIndiaMechanismStatus()}
-            isHovered={hoveredNodeId === 'india_mechanism'}
-            label="The Chakra of Balance"
-          />
-        </g>
-
-        {/* --- JAPAN 1: The Misplaced Screen --- */}
-        <g
-          id="node-japan-puzzle-1"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'puzzle',
-              civId: 'japan',
-              id: 'japan_puzzle_1',
-              name: 'The Misplaced Screen',
-              description: CIVILIZATIONS.japan.puzzles[0].description,
-              riddle: CIVILIZATIONS.japan.puzzles[0].riddle,
-              status: getJapanPuzzle1Status(),
-              lockReason: 'Activate India\'s "The Chakra of Balance" first to open the sea passage to Japan.',
-              rewardName: CIVILIZATIONS.japan.puzzles[0].reward.name,
-              rewardIcon: CIVILIZATIONS.japan.puzzles[0].reward.icon,
-              rewardDesc: CIVILIZATIONS.japan.puzzles[0].reward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('japan_puzzle_1')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Tatami Shoji Pavilion */}
-          <g transform="translate(890, 360)">
-            <polygon points="20,0 42,12 -2,12" fill="#78350f" />
-            <rect x="2" y="12" width="36" height="20" fill="#f8fafc" stroke="#334155" strokeWidth="2" />
-            <line x1="14" y1="12" x2="14" y2="32" stroke="#94a3b8" strokeWidth="1.5" />
-            <line x1="26" y1="12" x2="26" y2="32" stroke="#94a3b8" strokeWidth="1.5" />
-          </g>
-          <LocationPin
-            x={910}
-            y={350}
-            status={getJapanPuzzle1Status()}
-            isHovered={hoveredNodeId === 'japan_puzzle_1'}
-            label="The Misplaced Screen"
-          />
-        </g>
-
-        {/* --- JAPAN 2: The Bell Sequence --- */}
-        <g
-          id="node-japan-puzzle-2"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'puzzle',
-              civId: 'japan',
-              id: 'japan_puzzle_2',
-              name: 'The Bell Sequence',
-              description: CIVILIZATIONS.japan.puzzles[1].description,
-              riddle: CIVILIZATIONS.japan.puzzles[1].riddle,
-              status: getJapanPuzzle2Status(),
-              lockReason: 'Activate India\'s "The Chakra of Balance" first to open the sea passage to Japan.',
-              rewardName: CIVILIZATIONS.japan.puzzles[1].reward.name,
-              rewardIcon: CIVILIZATIONS.japan.puzzles[1].reward.icon,
-              rewardDesc: CIVILIZATIONS.japan.puzzles[1].reward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('japan_puzzle_2')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Wooden Bell Belfry */}
-          <g transform="translate(1040, 320)">
-            <polygon points="18,0 38,10 -2,10" fill="#451a03" />
-            <rect x="4" y="10" width="4" height="22" fill="#78350f" />
-            <rect x="28" y="10" width="4" height="22" fill="#78350f" />
-            {/* Hanging Bronze Bell */}
-            <path d="M 12 16 Q 18 14 24 16 L 26 25 L 10 25 Z" fill="#b45309" stroke="#f59e0b" strokeWidth="1" />
-          </g>
-          <LocationPin
-            x={1060}
-            y={310}
-            status={getJapanPuzzle2Status()}
-            isHovered={hoveredNodeId === 'japan_puzzle_2'}
-            label="The Bell Sequence"
-          />
-        </g>
-
-        {/* --- JAPAN MECHANISM: The Shrine of Memories --- */}
-        <g
-          id="node-japan-mechanism"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'mechanism',
-              civId: 'japan',
-              id: 'japan_mechanism',
-              name: 'The Shrine of Memories',
-              description: CIVILIZATIONS.japan.mechanism.description,
-              status: getJapanMechanismStatus(),
-              lockReason: !isJapanUnlocked
-                ? 'Activate India\'s "The Chakra of Balance" first to reach Japan.'
-                : 'Complete both "The Misplaced Screen" and "The Bell Sequence" to release the Shrine gate.',
-              rewardName: CIVILIZATIONS.japan.mechanism.fragmentReward.name,
-              rewardDesc: CIVILIZATIONS.japan.mechanism.fragmentReward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('japan_mechanism')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Grand Torii Gate & Pagoda Shrine */}
-          <g transform="translate(960, 150)">
-            <rect x="0" y="8" width="60" height="6" fill="#dc2626" />
-            <rect x="6" y="14" width="48" height="4" fill="#991b1b" />
-            <rect x="12" y="18" width="6" height="34" fill="#dc2626" />
-            <rect x="42" y="18" width="6" height="34" fill="#dc2626" />
-            {/* Sacred Shimenawa Rope */}
-            <rect x="18" y="22" width="24" height="3" fill="#fef08a" />
-          </g>
-          <MechanismPin
-            x={990}
-            y={140}
-            status={getJapanMechanismStatus()}
-            isHovered={hoveredNodeId === 'japan_mechanism'}
-            label="The Shrine of Memories"
-          />
-        </g>
-
-        {/* --- EGYPT 1: The Scattered Ceiling --- */}
-        <g
-          id="node-egypt-puzzle-1"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'puzzle',
-              civId: 'egypt',
-              id: 'egypt_puzzle_1',
-              name: 'The Scattered Ceiling',
-              description: CIVILIZATIONS.egypt.puzzles[0].description,
-              riddle: CIVILIZATIONS.egypt.puzzles[0].riddle,
-              status: getEgyptPuzzle1Status(),
-              lockReason: 'Activate Japan\'s "The Shrine of Memories" first to unlock the caravan route to Egypt.',
-              rewardName: CIVILIZATIONS.egypt.puzzles[0].reward.name,
-              rewardIcon: CIVILIZATIONS.egypt.puzzles[0].reward.icon,
-              rewardDesc: CIVILIZATIONS.egypt.puzzles[0].reward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('egypt_puzzle_1')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Star Hypostyle Colonnade Ruin */}
-          <g transform="translate(120, 440)">
-            <rect x="0" y="0" width="38" height="6" fill="#d97706" />
-            <rect x="4" y="6" width="6" height="24" fill="#b45309" />
-            <rect x="16" y="6" width="6" height="24" fill="#b45309" />
-            <rect x="28" y="6" width="6" height="24" fill="#b45309" />
-            {/* Inlaid blue lapis stars */}
-            <rect x="8" y="2" width="3" height="2" fill="#0284c7" />
-            <rect x="20" y="2" width="3" height="2" fill="#facc15" />
-          </g>
-          <LocationPin
-            x={140}
-            y={430}
-            status={getEgyptPuzzle1Status()}
-            isHovered={hoveredNodeId === 'egypt_puzzle_1'}
-            label="The Scattered Ceiling"
-          />
-        </g>
-
-        {/* --- EGYPT 2: The Cracked Basin --- */}
-        <g
-          id="node-egypt-puzzle-2"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'puzzle',
-              civId: 'egypt',
-              id: 'egypt_puzzle_2',
-              name: 'The Cracked Basin',
-              description: CIVILIZATIONS.egypt.puzzles[1].description,
-              riddle: CIVILIZATIONS.egypt.puzzles[1].riddle,
-              status: getEgyptPuzzle2Status(),
-              lockReason: 'Activate Japan\'s "The Shrine of Memories" first to unlock the caravan route to Egypt.',
-              rewardName: CIVILIZATIONS.egypt.puzzles[1].reward.name,
-              rewardIcon: CIVILIZATIONS.egypt.puzzles[1].reward.icon,
-              rewardDesc: CIVILIZATIONS.egypt.puzzles[1].reward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('egypt_puzzle_2')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Turquoise Alabaster Spring Basin */}
-          <g transform="translate(260, 500)">
-            <rect x="0" y="10" width="40" height="22" fill="#78350f" stroke="#b45309" strokeWidth="2" />
-            <rect x="6" y="14" width="28" height="14" fill="#06b6d4" />
-            {/* Crack fracture lines */}
-            <line x1="8" y1="14" x2="20" y2="28" stroke="#1c1917" strokeWidth="2" />
-            <line x1="28" y1="14" x2="22" y2="24" stroke="#1c1917" strokeWidth="1.5" />
-          </g>
-          <LocationPin
-            x={280}
-            y={490}
-            status={getEgyptPuzzle2Status()}
-            isHovered={hoveredNodeId === 'egypt_puzzle_2'}
-            label="The Cracked Basin"
-          />
-        </g>
-
-        {/* --- EGYPT MECHANISM: The Pyramid of Secrets --- */}
-        <g
-          id="node-egypt-mechanism"
-          className="cursor-pointer"
-          onClick={() =>
-            handleNodeClick({
-              type: 'mechanism',
-              civId: 'egypt',
-              id: 'egypt_mechanism',
-              name: 'The Pyramid of Secrets',
-              description: CIVILIZATIONS.egypt.mechanism.description,
-              status: getEgyptMechanismStatus(),
-              lockReason: !isEgyptUnlocked
-                ? 'Activate Japan\'s "The Shrine of Memories" first to reach Egypt.'
-                : 'Complete both "The Scattered Ceiling" and "The Cracked Basin" to unlock the Pyramid portal.',
-              rewardName: CIVILIZATIONS.egypt.mechanism.fragmentReward.name,
-              rewardDesc: CIVILIZATIONS.egypt.mechanism.fragmentReward.description,
-            })
-          }
-          onMouseEnter={() => setHoveredNodeId('egypt_mechanism')}
-          onMouseLeave={() => setHoveredNodeId(null)}
-        >
-          {/* Landmark: Monumental Golden Pyramid */}
-          <g transform="translate(180, 270)">
-            <polygon points="30,0 64,54 -4,54" fill="#b45309" />
-            <polygon points="30,0 64,54 30,54" fill="#92400e" />
-            <polygon points="30,0 38,15 22,15" fill="#fef08a" />
-            {/* Pyramid Portal Doorway */}
-            <rect x="25" y="42" width="10" height="12" fill="#09090b" stroke="#facc15" strokeWidth="1.5" />
-          </g>
-          <MechanismPin
-            x={210}
-            y={260}
-            status={getEgyptMechanismStatus()}
-            isHovered={hoveredNodeId === 'egypt_mechanism'}
-            label="The Pyramid of Secrets"
-          />
-        </g>
-
-        {/* ======================================================== */}
-        {/* ANIMATED PLAYER EXPLORER SPRITE / MARKER (8-Directional) */}
+        {/* 8-DIRECTIONAL PRIESTESS CHARACTER SPRITE (SCALED & VISIBLE)*/}
         {/* ======================================================== */}
         <g
-          id="player-adventurer-sprite"
-          transform={`translate(${playerPos.x}, ${playerPos.y + 14})`}
-          className="transition-all duration-500 ease-out pointer-events-none"
+          transform={`translate(${playerPos.x}, ${playerPos.y + 4})`}
+          className="transition-all duration-300 ease-out pointer-events-none"
         >
-          {/* Stone Altar Disc Shadow */}
-          <ellipse cx="0" cy="8" rx="15" ry="6" fill="#000000" opacity="0.6" />
-          <ellipse cx="0" cy="8" rx="11" ry="4" fill="#f59e0b" opacity="0.25">
-            <animate attributeName="rx" values="10;13;10" dur="1.8s" repeatCount="indefinite" />
+          {/* Glowing Ground Pedestal Ring */}
+          <ellipse cx="0" cy="24" rx="28" ry="10" fill="#000000" fillOpacity="0.85" />
+          <ellipse cx="0" cy="24" rx="22" ry="8" fill="none" stroke="#facc15" strokeWidth="3" opacity="0.9">
+            <animate attributeName="rx" values="20;25;20" dur="1s" repeatCount="indefinite" />
           </ellipse>
 
-          {/* Authentic 8-Directional Priestess Pixel Sprite */}
-          <image
-            href={PRIESTESS_SPRITES[playerDirection] || PRIESTESS_SPRITES['south']}
-            x="-20"
-            y="-34"
-            width="40"
-            height="40"
-            style={{ imageRendering: 'pixelated' }}
-          />
+          {/* 8-Directional Character Sprite (Chunky, Scaled 54x54) */}
+          <g transform="translate(-27, -32)">
+            <image
+              href={PRIESTESS_SPRITES[playerDirection]}
+              x="0"
+              y="0"
+              width="54"
+              height="54"
+              style={{ imageRendering: 'pixelated' }}
+            />
+          </g>
 
-          {/* "YOU ARE HERE" Beacon Indicator */}
+          {/* Player Name Banner */}
           <g transform="translate(0, -42)">
-            <rect x="-14" y="-8" width="28" height="11" fill="#18181b" stroke="#f59e0b" strokeWidth="1.2" />
-            <text x="0" y="-1" fill="#fef08a" fontFamily="'Press Start 2P', monospace" fontSize="5" textAnchor="middle">
-              YOU
+            <rect x="-42" y="-1" width="84" height="18" fill="#000000" rx="3" />
+            <rect x="-40" y="-3" width="80" height="18" fill="#d97706" stroke="#fef08a" strokeWidth="2" rx="3" />
+            <text x="0" y="9" fill="#000000" fontFamily="'Press Start 2P', monospace" fontSize="7" textAnchor="middle" fontWeight="bold">
+              ANANYA
             </text>
           </g>
         </g>
       </svg>
+
+      {/* 4. Top Quick-Inspect HUD Card (Instant readability on current or hovered location) */}
+      {activeInspectNode && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-auto bg-zinc-950/95 border-3 border-amber-500 shadow-[0_0_25px_rgba(0,0,0,0.9),0_0_15px_rgba(245,158,11,0.4)] px-4 py-2.5 flex items-center gap-4 animate-in fade-in duration-150">
+          <div className="w-10 h-10 border-2 border-amber-400 bg-stone-900 flex items-center justify-center text-xl shrink-0 shadow-[inset_0_0_8px_rgba(0,0,0,0.8)]">
+            {activeInspectNode.relicIcon}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-pixel text-[9px] text-amber-400">
+                {CIVILIZATIONS[activeInspectNode.civId].name.toUpperCase()} · {activeInspectNode.chamberNum}
+              </span>
+              <span
+                className={`font-pixel text-[8px] px-1.5 py-0.5 border ${
+                  activeInspectStatus === 'completed'
+                    ? 'border-emerald-500 bg-emerald-950 text-emerald-300'
+                    : activeInspectStatus === 'available'
+                    ? 'border-amber-400 bg-amber-950 text-amber-300 animate-pulse'
+                    : 'border-zinc-700 bg-zinc-900 text-zinc-500'
+                }`}
+              >
+                {activeInspectStatus === 'completed' ? '✓ CLEARED' : activeInspectStatus === 'available' ? '★ AVAILABLE' : '🔒 LOCKED'}
+              </span>
+            </div>
+            <h3 className="font-pixel text-xs text-zinc-100 tracking-wide mt-0.5">
+              {activeInspectNode.name}
+            </h3>
+          </div>
+
+          <button
+            onClick={() => handleNodeClick(activeInspectNode.id)}
+            className={`pixel-btn ml-2 px-3.5 py-1.5 font-pixel text-[10px] border-2 flex items-center gap-1.5 transition-colors ${
+              activeInspectStatus === 'completed'
+                ? 'border-emerald-500 bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900'
+                : activeInspectStatus === 'available'
+                ? 'border-amber-300 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold'
+                : 'border-zinc-700 bg-zinc-900 text-zinc-500'
+            }`}
+          >
+            {activeInspectStatus === 'completed' ? 'REPLAY' : activeInspectStatus === 'available' ? 'EXPLORE' : 'INSPECT'}
+          </button>
+        </div>
+      )}
     </div>
-  );
-};
-
-// Reusable Location Pin Component
-const LocationPin: React.FC<{
-  x: number;
-  y: number;
-  status: 'available' | 'completed' | 'locked';
-  isHovered: boolean;
-  label: string;
-}> = ({ x, y, status, isHovered, label }) => {
-  const colors = {
-    available: { bg: '#d97706', border: '#fbbf24', text: '#fef08a', icon: '✦' },
-    completed: { bg: '#059669', border: '#34d399', text: '#a7f3d0', icon: '✓' },
-    locked: { bg: '#27272a', border: '#52525b', text: '#a1a1aa', icon: '🔒' },
-  }[status];
-
-  return (
-    <g transform={`translate(${x}, ${y})`}>
-      {/* Pulsing ring if available */}
-      {status === 'available' && (
-        <circle cx="0" cy="0" r="10" fill="none" stroke="#fbbf24" strokeWidth="1.5">
-          <animate attributeName="r" values="8;14;8" dur="1.5s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.8;0;0.8" dur="1.5s" repeatCount="indefinite" />
-        </circle>
-      )}
-
-      {/* Main Pin Diamond */}
-      <polygon
-        points="0,-8 8,0 0,8 -8,0"
-        fill={colors.bg}
-        stroke={isHovered ? '#ffffff' : colors.border}
-        strokeWidth="2"
-      />
-      <text x="0" y="3" fill={colors.text} fontFamily="'Press Start 2P', monospace" fontSize="7" textAnchor="middle">
-        {colors.icon}
-      </text>
-
-      {/* Label Tooltip on hover */}
-      {isHovered && (
-        <g transform="translate(0, -18)">
-          <rect x="-60" y="-8" width="120" height="14" fill="#09090b" stroke="#f59e0b" strokeWidth="1.5" />
-          <text x="0" y="2" fill="#fef08a" fontFamily="'Silkscreen', monospace" fontSize="8" textAnchor="middle">
-            {label}
-          </text>
-        </g>
-      )}
-    </g>
-  );
-};
-
-// Reusable Mechanism Pin Component (Larger)
-const MechanismPin: React.FC<{
-  x: number;
-  y: number;
-  status: 'available' | 'completed' | 'locked';
-  isHovered: boolean;
-  label: string;
-}> = ({ x, y, status, isHovered, label }) => {
-  const colors = {
-    available: { bg: '#f59e0b', border: '#fde047', text: '#000000', icon: '⚙' },
-    completed: { bg: '#059669', border: '#34d399', text: '#ffffff', icon: '★' },
-    locked: { bg: '#18181b', border: '#52525b', text: '#a1a1aa', icon: '🔒' },
-  }[status];
-
-  return (
-    <g transform={`translate(${x}, ${y})`}>
-      {/* Radiant beacon if available */}
-      {status === 'available' && (
-        <circle cx="0" cy="0" r="14" fill="none" stroke="#fde047" strokeWidth="2">
-          <animate attributeName="r" values="10;18;10" dur="1.2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="1;0;1" dur="1.2s" repeatCount="indefinite" />
-        </circle>
-      )}
-
-      {/* Octagonal Vault Pin */}
-      <polygon
-        points="-4,-11 4,-11 11,-4 11,4 4,11 -4,11 -11,4 -11,-4"
-        fill={colors.bg}
-        stroke={isHovered ? '#ffffff' : colors.border}
-        strokeWidth="2.5"
-      />
-      <text x="0" y="4" fill={colors.text} fontFamily="'Press Start 2P', monospace" fontSize="8" textAnchor="middle">
-        {colors.icon}
-      </text>
-
-      {/* Label Tooltip */}
-      {isHovered && (
-        <g transform="translate(0, -22)">
-          <rect x="-70" y="-8" width="140" height="15" fill="#09090b" stroke="#fde047" strokeWidth="1.5" />
-          <text x="0" y="3" fill="#fde047" fontFamily="'Press Start 2P', monospace" fontSize="7" textAnchor="middle">
-            {label}
-          </text>
-        </g>
-      )}
-    </g>
   );
 };

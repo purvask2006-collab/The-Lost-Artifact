@@ -101,11 +101,16 @@ export const WorldMap: React.FC = () => {
             <span>TITLE</span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <Compass className="w-4 h-4 text-amber-500 animate-spin [animation-duration:20s]" />
-            <h1 className="font-pixel text-xs md:text-sm text-amber-400 tracking-wider">
-              OVERWORLD MAP
-            </h1>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl text-amber-400 animate-spin [animation-duration:24s]">☸</span>
+            <div>
+              <h1 className="font-pixel text-xs md:text-sm text-amber-400 tracking-wider">
+                THE LOST ARTIFACT
+              </h1>
+              <div className="hidden sm:block text-[9px] text-zinc-400 font-silkscreen">
+                THREE CIVILIZATIONS. ONE FORGOTTEN SECRET.
+              </div>
+            </div>
           </div>
         </div>
 
@@ -180,6 +185,7 @@ export const WorldMap: React.FC = () => {
         <PixelOverworldMap
           onSelectLocation={handleSelectLocation}
           activeLocationId={activeLocationId}
+          onSelectCivilization={selectCivilization}
         />
       </main>
 
@@ -188,42 +194,39 @@ export const WorldMap: React.FC = () => {
         {/* Civilizations Progression Strip */}
         <div className="flex flex-wrap items-center gap-3">
           {/* India Status */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-900 border border-amber-600/80 text-amber-300">
-            <span className="font-pixel text-[10px]">INDIA</span>
+          <button
+            onClick={() => {
+              soundManager.playClick(state.soundEnabled);
+              selectCivilization('india');
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-900 border border-emerald-500/80 hover:bg-emerald-950/40 text-emerald-300 pixel-btn cursor-pointer"
+          >
+            <span className="font-pixel text-[10px]">☸ INDIA</span>
             <span className="text-[10px]">
-              {state.unlockedMechanisms.india_mechanism ? '✓ UNLOCKED' : '✦ IN PROGRESS'}
+              {state.unlockedMechanisms.india_mechanism ? '✓ COMPLETED' : '✦ IN PROGRESS'}
             </span>
-          </div>
-
-          {/* Japan Status */}
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 border transition-colors ${
-            isJapanUnlocked
-              ? 'bg-zinc-900 border-sky-500/80 text-sky-300'
-              : 'bg-zinc-950 border-zinc-800 text-zinc-500'
-          }`}>
-            <span className="font-pixel text-[10px]">JAPAN</span>
-            {isJapanUnlocked ? (
-              <span className="text-[10px]">
-                {state.unlockedMechanisms.japan_mechanism ? '✓ UNLOCKED' : '✦ IN PROGRESS'}
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-[10px]">
-                <Lock className="w-3 h-3" />
-                SEALED
-              </span>
-            )}
-          </div>
+          </button>
 
           {/* Egypt Status */}
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 border transition-colors ${
-            isEgyptUnlocked
-              ? 'bg-zinc-900 border-yellow-500/80 text-yellow-300'
-              : 'bg-zinc-950 border-zinc-800 text-zinc-500'
-          }`}>
-            <span className="font-pixel text-[10px]">EGYPT</span>
+          <button
+            onClick={() => {
+              if (isEgyptUnlocked) {
+                soundManager.playClick(state.soundEnabled);
+                selectCivilization('egypt');
+              } else {
+                soundManager.playCancel(state.soundEnabled);
+              }
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1 border transition-colors ${
+              isEgyptUnlocked
+                ? 'bg-zinc-900 border-yellow-500/80 hover:bg-yellow-950/40 text-yellow-300 pixel-btn cursor-pointer'
+                : 'bg-zinc-950 border-zinc-800 text-zinc-500 cursor-not-allowed'
+            }`}
+          >
+            <span className="font-pixel text-[10px]">☥ EGYPT</span>
             {isEgyptUnlocked ? (
               <span className="text-[10px]">
-                {state.unlockedMechanisms.egypt_mechanism ? '✓ UNLOCKED' : '✦ IN PROGRESS'}
+                {state.unlockedMechanisms.egypt_mechanism ? '✓ COMPLETED' : '✦ IN PROGRESS'}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-[10px]">
@@ -231,7 +234,36 @@ export const WorldMap: React.FC = () => {
                 SEALED
               </span>
             )}
-          </div>
+          </button>
+
+          {/* Japan Status */}
+          <button
+            onClick={() => {
+              if (isJapanUnlocked) {
+                soundManager.playClick(state.soundEnabled);
+                selectCivilization('japan');
+              } else {
+                soundManager.playCancel(state.soundEnabled);
+              }
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1 border transition-colors ${
+              isJapanUnlocked
+                ? 'bg-zinc-900 border-sky-500/80 hover:bg-sky-950/40 text-sky-300 pixel-btn cursor-pointer'
+                : 'bg-zinc-950 border-zinc-800 text-zinc-500 cursor-not-allowed'
+            }`}
+          >
+            <span className="font-pixel text-[10px]">⛩ JAPAN</span>
+            {isJapanUnlocked ? (
+              <span className="text-[10px]">
+                {state.unlockedMechanisms.japan_mechanism ? '✓ COMPLETED' : '✦ IN PROGRESS'}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[10px]">
+                <Lock className="w-3 h-3" />
+                SEALED
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Fragment Keystones Counter */}

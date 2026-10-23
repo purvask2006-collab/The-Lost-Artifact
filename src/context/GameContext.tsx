@@ -227,8 +227,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const openChamber = useCallback((puzzleId: PuzzleId) => {
     soundManager.playClick(state.soundEnabled);
     setState(prev => {
+      const civId = (puzzleId.split('_')[0] as CivilizationId) || prev.selectedCiv || 'india';
       const next: GameState = {
         ...prev,
+        selectedCiv: civId,
         activePuzzleId: puzzleId,
         currentScreen: 'PUZZLE',
       };
@@ -240,8 +242,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const openMechanism = useCallback((mechanismId: MechanismId) => {
     soundManager.playClick(state.soundEnabled);
     setState(prev => {
+      const civId = (mechanismId.split('_')[0] as CivilizationId) || prev.selectedCiv || 'india';
       const next: GameState = {
         ...prev,
+        selectedCiv: civId,
         activeMechanismId: mechanismId,
         currentScreen: 'MECHANISM',
       };

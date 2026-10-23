@@ -1,6 +1,6 @@
 {
   "name": "The Lost Artifact",
-  "description": "A pixel-art puzzle adventure across ancient India, Japan, and Egypt to recover forgotten artifact fragments and assemble the ancient truth.",
+  "description": "An ancient puzzle adventure across civilizations to recover forgotten artifact fragments and assemble the lost truth.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }
