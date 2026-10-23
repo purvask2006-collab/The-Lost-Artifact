@@ -1,24 +1,22 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { PixelOverworldMap } from './PixelOverworldMap';
-import { LocationModal, LocationTarget } from './LocationModal';
 import { HowToPlayModal } from './HowToPlayModal';
 import { ResetConfirmModal } from './ResetConfirmModal';
 import { InventoryModal } from './InventoryModal';
-import { FragmentPixelBadge } from './PixelArtwork';
-import { CivilizationId, PuzzleId, MechanismId } from '../types/game';
+import { FragmentPixelBadge, GuardianEnvironmentalDisplay } from './PixelArtwork';
 import { 
   ArrowLeft, 
   Volume2, 
   VolumeX, 
-  Monitor, 
+  Music,
   HelpCircle, 
   Backpack, 
-  Compass, 
   Sparkles, 
   RotateCcw,
   Lock,
-  Unlock
+  CheckCircle2,
+  Play
 } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
@@ -27,74 +25,47 @@ export const WorldMap: React.FC = () => {
     state, 
     returnToTitle, 
     toggleSound, 
-    toggleCrtFilter, 
+    toggleMusic, 
     resetGame,
     goToScreen,
-    solvePuzzle,
-    unlockMechanism,
     selectCivilization,
-    openChamber,
-    openMechanism
   } = useGame();
 
-  const [activeLocationId, setActiveLocationId] = useState<string>('india_puzzle_1');
-  const [selectedLocation, setSelectedLocation] = useState<LocationTarget | null>(null);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
 
   const fragmentsCount = Object.values(state.recoveredFragments).filter(Boolean).length;
+  const gemsCount = Object.values(state.collectedGemstones).filter(Boolean).length;
   const puzzlesCount = Object.values(state.solvedPuzzles).filter(Boolean).length;
-  const mechanismsCount = Object.values(state.unlockedMechanisms).filter(Boolean).length;
 
-  const isJapanUnlocked = Boolean(state.unlockedMechanisms.india_mechanism);
-  const isEgyptUnlocked = Boolean(state.unlockedMechanisms.japan_mechanism);
+  const isIndiaCompleted = Boolean(state.recoveredFragments.fragment_solar_wheel);
+  const isJapanUnlocked = Boolean(state.unlockedCivs.japan || state.recoveredFragments.fragment_solar_wheel);
+  const isJapanCompleted = Boolean(state.recoveredFragments.fragment_celestial_mirror);
+  const isEgyptUnlocked = Boolean(state.unlockedCivs.egypt || state.recoveredFragments.fragment_celestial_mirror);
+  const isEgyptCompleted = Boolean(state.recoveredFragments.fragment_eternal_eye);
 
-  const handleSelectLocation = (target: LocationTarget) => {
-    setActiveLocationId(target.id);
-    setSelectedLocation(target);
-  };
-
-  const handleSolvePuzzle = (puzzleId: PuzzleId) => {
-    solvePuzzle(puzzleId);
-    // Refresh modal with completed state
-    if (selectedLocation) {
-      setSelectedLocation({
-        ...selectedLocation,
-        status: 'completed',
-      });
+  const handleSelectCiv = (civId: 'india' | 'japan' | 'egypt') => {
+    if (civId === 'japan' && !isJapanUnlocked) {
+      soundManager.playCancel(state.soundEnabled);
+      return;
     }
-  };
-
-  const handleUnlockMechanism = (mechanismId: MechanismId) => {
-    unlockMechanism(mechanismId);
-    // Refresh modal with completed state
-    if (selectedLocation) {
-      setSelectedLocation({
-        ...selectedLocation,
-        status: 'completed',
-      });
+    if (civId === 'egypt' && !isEgyptUnlocked) {
+      soundManager.playCancel(state.soundEnabled);
+      return;
     }
-  };
-
-  const handleEnterLocation = (civId: CivilizationId, type: 'puzzle' | 'mechanism', id: PuzzleId | MechanismId) => {
-    setSelectedLocation(null);
+    soundManager.playTravel(state.soundEnabled);
     selectCivilization(civId);
-    if (type === 'mechanism') {
-      openMechanism(id as MechanismId);
-    } else {
-      openChamber(id as PuzzleId);
-    }
   };
 
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-between p-3 md:p-5 bg-zinc-950 text-zinc-100 select-none overflow-x-hidden">
-      {/* 1. Top Bar Navigation (<15% height, clean, single row) */}
-      <header className="relative z-10 w-full flex flex-wrap items-center justify-between gap-2 border-b-2 border-zinc-800 pb-2.5">
+      {/* 1. Top Bar Navigation */}
+      <header className="relative z-10 w-full flex flex-wrap items-center justify-between gap-3 border-b-2 border-zinc-800 pb-3">
         <div className="flex items-center gap-3">
           <button
             onClick={returnToTitle}
-            className="pixel-btn px-3 py-1.5 flex items-center gap-1.5 border-2 border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-pixel text-[11px] transition-colors"
+            className="pixel-btn px-3 py-1.5 flex items-center gap-1.5 border-2 border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-pixel text-xs transition-colors cursor-pointer"
             title="Return to Title"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -102,65 +73,78 @@ export const WorldMap: React.FC = () => {
           </button>
 
           <div className="flex items-center gap-2.5">
-            <span className="text-xl text-amber-400 animate-spin [animation-duration:24s]">☸</span>
+            <span className="text-xl text-amber-400">☸</span>
             <div>
               <h1 className="font-pixel text-xs md:text-sm text-amber-400 tracking-wider">
                 THE LOST ARTIFACT
               </h1>
-              <div className="hidden sm:block text-[9px] text-zinc-400 font-silkscreen">
-                THREE CIVILIZATIONS. ONE FORGOTTEN SECRET.
+              <div className="text-[10px] text-zinc-400 font-silkscreen hidden sm:block">
+                EXPLORE THREE REALMS · RECOVER 12 GEMSTONE KEYS
               </div>
             </div>
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* 3 Fragment Silhouettes at Top */}
+        <div className="flex items-center gap-3 px-3 py-1 bg-zinc-900 border-2 border-zinc-800">
+          <span className="font-pixel text-[9px] text-zinc-400 hidden md:inline">FRAGMENTS:</span>
+          <div className="flex items-center gap-2">
+            <FragmentPixelBadge fragmentId="fragment_solar_wheel" collected={state.recoveredFragments.fragment_solar_wheel} size="sm" />
+            <FragmentPixelBadge fragmentId="fragment_celestial_mirror" collected={state.recoveredFragments.fragment_celestial_mirror} size="sm" />
+            <FragmentPixelBadge fragmentId="fragment_eternal_eye" collected={state.recoveredFragments.fragment_eternal_eye} size="sm" />
+          </div>
+          <span className="font-pixel text-xs text-amber-400 ml-1">
+            {fragmentsCount}/3
+          </span>
+        </div>
+
+        {/* Controls */}
         <div className="flex items-center gap-2">
-          {/* Inventory / Codex */}
+          {/* Codex Gemstones Inventory */}
           <button
             onClick={() => {
               soundManager.playClick(state.soundEnabled);
               setShowInventory(true);
             }}
-            className="pixel-btn px-2.5 py-1.5 flex items-center gap-1.5 border-2 border-amber-600/80 bg-zinc-900 hover:bg-zinc-800 text-amber-300 font-pixel text-[11px] transition-colors"
+            className="pixel-btn px-3 py-1.5 flex items-center gap-1.5 border-2 border-amber-600 bg-zinc-900 hover:bg-zinc-800 text-amber-300 font-pixel text-xs transition-colors cursor-pointer"
           >
             <Backpack className="w-3.5 h-3.5" />
-            <span>CODEX</span>
+            <span>GEMSTONES ({gemsCount}/12)</span>
           </button>
 
           {/* Sound Toggle */}
           <button
             onClick={toggleSound}
-            className={`pixel-btn px-2.5 py-1.5 border-2 text-[11px] font-pixel transition-colors ${
+            className={`pixel-btn p-1.5 border-2 text-xs font-pixel transition-colors cursor-pointer ${
               state.soundEnabled
                 ? 'border-amber-500 bg-amber-950/60 text-amber-300'
                 : 'border-zinc-700 bg-zinc-900 text-zinc-500'
             }`}
-            title="Toggle Sound Effects"
+            title="Toggle SFX"
           >
-            {state.soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            {state.soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
 
-          {/* CRT Filter Toggle */}
+          {/* Music Toggle */}
           <button
-            onClick={toggleCrtFilter}
-            className={`pixel-btn hidden sm:flex items-center px-2 py-1.5 border-2 text-[11px] font-pixel transition-colors ${
-              state.crtFilterEnabled
-                ? 'border-zinc-600 bg-zinc-900 text-zinc-300'
-                : 'border-zinc-800 bg-zinc-950 text-zinc-600'
+            onClick={toggleMusic}
+            className={`pixel-btn p-1.5 border-2 text-xs font-pixel transition-colors cursor-pointer ${
+              state.musicEnabled
+                ? 'border-sky-500 bg-sky-950/60 text-sky-300'
+                : 'border-zinc-700 bg-zinc-900 text-zinc-500'
             }`}
-            title="Toggle CRT Scanlines"
+            title="Toggle Music"
           >
-            <Monitor className="w-3.5 h-3.5" />
+            <Music className="w-4 h-4" />
           </button>
 
-          {/* How to play */}
+          {/* Help */}
           <button
             onClick={() => {
               soundManager.playClick(state.soundEnabled);
               setShowHowToPlay(true);
             }}
-            className="pixel-btn p-1.5 border-2 border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300"
+            className="pixel-btn p-1.5 border-2 border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 cursor-pointer"
             title="How to Play"
           >
             <HelpCircle className="w-4 h-4" />
@@ -172,7 +156,7 @@ export const WorldMap: React.FC = () => {
               soundManager.playClick(state.soundEnabled);
               setShowResetConfirm(true);
             }}
-            className="pixel-btn p-1.5 border-2 border-zinc-800 hover:border-red-700 bg-zinc-900 hover:bg-red-950/40 text-zinc-500 hover:text-red-400"
+            className="pixel-btn p-1.5 border-2 border-zinc-800 hover:border-red-700 bg-zinc-900 hover:bg-red-950/40 text-zinc-500 hover:text-red-400 cursor-pointer"
             title="Reset Game"
           >
             <RotateCcw className="w-4 h-4" />
@@ -180,132 +164,88 @@ export const WorldMap: React.FC = () => {
         </div>
       </header>
 
-      {/* 2. Interactive Pixel Overworld Map Canvas (Unobstructed View) */}
+      {/* 2. Interactive Overworld Canvas */}
       <main className="relative z-10 w-full max-w-6xl mx-auto my-auto py-2">
-        <PixelOverworldMap
-          onSelectLocation={handleSelectLocation}
-          activeLocationId={activeLocationId}
-          onSelectCivilization={selectCivilization}
-        />
+        <PixelOverworldMap onSelectCivilization={handleSelectCiv} />
       </main>
 
-      {/* 3. Bottom Low-Occlusion Status & Civilization Progression Tracker */}
+      {/* 3. Bottom Civilization Quick Travel & Status Strip */}
       <footer className="relative z-10 w-full max-w-6xl mx-auto border-t-2 border-zinc-800 pt-3 flex flex-col md:flex-row items-center justify-between gap-3 text-xs font-silkscreen">
-        {/* Civilizations Progression Strip */}
+        {/* Civilizations Navigation Cards */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* India Status */}
+          {/* India */}
           <button
-            onClick={() => {
-              soundManager.playClick(state.soundEnabled);
-              selectCivilization('india');
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-900 border border-emerald-500/80 hover:bg-emerald-950/40 text-emerald-300 pixel-btn cursor-pointer"
+            onClick={() => handleSelectCiv('india')}
+            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 border-2 border-amber-500/80 hover:bg-amber-950/40 text-amber-300 pixel-btn cursor-pointer"
           >
-            <span className="font-pixel text-[10px]">☸ INDIA</span>
+            <span className="font-pixel text-[11px]">☸ INDIA</span>
             <span className="text-[10px]">
-              {state.unlockedMechanisms.india_mechanism ? '✓ COMPLETED' : '✦ IN PROGRESS'}
+              {isIndiaCompleted ? '★ SOLVED' : '✦ AMARA'}
             </span>
           </button>
 
-          {/* Egypt Status */}
+          {/* Japan */}
           <button
-            onClick={() => {
-              if (isEgyptUnlocked) {
-                soundManager.playClick(state.soundEnabled);
-                selectCivilization('egypt');
-              } else {
-                soundManager.playCancel(state.soundEnabled);
-              }
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 border transition-colors ${
-              isEgyptUnlocked
-                ? 'bg-zinc-900 border-yellow-500/80 hover:bg-yellow-950/40 text-yellow-300 pixel-btn cursor-pointer'
-                : 'bg-zinc-950 border-zinc-800 text-zinc-500 cursor-not-allowed'
-            }`}
-          >
-            <span className="font-pixel text-[10px]">☥ EGYPT</span>
-            {isEgyptUnlocked ? (
-              <span className="text-[10px]">
-                {state.unlockedMechanisms.egypt_mechanism ? '✓ COMPLETED' : '✦ IN PROGRESS'}
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-[10px]">
-                <Lock className="w-3 h-3" />
-                SEALED
-              </span>
-            )}
-          </button>
-
-          {/* Japan Status */}
-          <button
-            onClick={() => {
-              if (isJapanUnlocked) {
-                soundManager.playClick(state.soundEnabled);
-                selectCivilization('japan');
-              } else {
-                soundManager.playCancel(state.soundEnabled);
-              }
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 border transition-colors ${
+            onClick={() => handleSelectCiv('japan')}
+            className={`flex items-center gap-2 px-3 py-1.5 border-2 transition-colors ${
               isJapanUnlocked
                 ? 'bg-zinc-900 border-sky-500/80 hover:bg-sky-950/40 text-sky-300 pixel-btn cursor-pointer'
-                : 'bg-zinc-950 border-zinc-800 text-zinc-500 cursor-not-allowed'
+                : 'bg-zinc-950 border-zinc-800 text-zinc-600 cursor-not-allowed'
             }`}
           >
-            <span className="font-pixel text-[10px]">⛩ JAPAN</span>
+            <span className="font-pixel text-[11px]">⛩ JAPAN</span>
             {isJapanUnlocked ? (
               <span className="text-[10px]">
-                {state.unlockedMechanisms.japan_mechanism ? '✓ COMPLETED' : '✦ IN PROGRESS'}
+                {isJapanCompleted ? '★ SOLVED' : '✦ YUKI'}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-[10px]">
                 <Lock className="w-3 h-3" />
-                SEALED
+                LOCKED
+              </span>
+            )}
+          </button>
+
+          {/* Egypt */}
+          <button
+            onClick={() => handleSelectCiv('egypt')}
+            className={`flex items-center gap-2 px-3 py-1.5 border-2 transition-colors ${
+              isEgyptUnlocked
+                ? 'bg-zinc-900 border-yellow-500/80 hover:bg-yellow-950/40 text-yellow-300 pixel-btn cursor-pointer'
+                : 'bg-zinc-950 border-zinc-800 text-zinc-600 cursor-not-allowed'
+            }`}
+          >
+            <span className="font-pixel text-[11px]">𓁹 EGYPT</span>
+            {isEgyptUnlocked ? (
+              <span className="text-[10px]">
+                {isEgyptCompleted ? '★ SOLVED' : '✦ KIYA'}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[10px]">
+                <Lock className="w-3 h-3" />
+                LOCKED
               </span>
             )}
           </button>
         </div>
 
-        {/* Fragment Keystones Counter */}
-        <div className="flex items-center gap-3">
-          <span className="font-pixel text-[10px] text-zinc-400">KEYSTONES:</span>
-          <div className="flex items-center gap-1.5">
-            <FragmentPixelBadge fragmentId="fragment_solar_wheel" collected={state.recoveredFragments.fragment_solar_wheel} size="sm" />
-            <FragmentPixelBadge fragmentId="fragment_celestial_mirror" collected={state.recoveredFragments.fragment_celestial_mirror} size="sm" />
-            <FragmentPixelBadge fragmentId="fragment_eternal_eye" collected={state.recoveredFragments.fragment_eternal_eye} size="sm" />
-          </div>
-          <span className="text-amber-400 font-pixel font-bold text-xs ml-1">
-            {fragmentsCount}/3
-          </span>
-        </div>
-
-        {/* Global Assembly Trigger or Progress Summary */}
+        {/* Global Assembly Trigger or Progress Count */}
         {fragmentsCount === 3 ? (
           <button
             onClick={() => goToScreen('ASSEMBLY')}
-            className="pixel-btn px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-pixel text-xs border-2 border-amber-300 font-bold animate-pulse flex items-center gap-1.5"
+            className="pixel-btn px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-pixel text-xs border-2 border-amber-300 font-bold animate-pulse flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.5)]"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>UNITE ARTIFACT</span>
+            <Sparkles className="w-4 h-4 fill-current" />
+            <span>ENTER FINAL CHAMBER (UNITE ARTIFACT)</span>
           </button>
         ) : (
-          <div className="text-[11px] text-zinc-400">
-            <span>Puzzles: <strong className="text-zinc-200">{puzzlesCount}/6</strong></span>
+          <div className="text-zinc-400 text-xs">
+            <span>Puzzles Solved: <strong className="text-zinc-200">{puzzlesCount}/12</strong></span>
             <span className="mx-2">·</span>
-            <span>Mechanisms: <strong className="text-zinc-200">{mechanismsCount}/3</strong></span>
+            <span>Gemstones: <strong className="text-amber-400">{gemsCount}/12</strong></span>
           </div>
         )}
       </footer>
-
-      {/* 4. Interactive Location Modal */}
-      <LocationModal
-        location={selectedLocation}
-        onClose={() => setSelectedLocation(null)}
-        onSolvePuzzle={handleSolvePuzzle}
-        onUnlockMechanism={handleUnlockMechanism}
-        onEnterLocation={handleEnterLocation}
-        soundEnabled={state.soundEnabled}
-      />
 
       {/* Auxiliary Modals */}
       <HowToPlayModal

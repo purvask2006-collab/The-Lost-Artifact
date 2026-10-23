@@ -1,10 +1,26 @@
 /**
- * Web Audio Retro Sound Synthesizer
- * Generates authentic 8-bit / 16-bit chiptune sound effects procedurally.
- * No external audio files or network requests required.
+ * Web Audio Retro Sound Synthesizer & Real Music Player
+ * Handles authentic 16-bit sound effects and atmospheric background music tracks.
  */
 
+// Uploaded audio assets from user
+export const AUDIO_TRACKS = {
+  bgm: {
+    mainTheme: '/assets/aistudio/Video_game_backgroun__2-1792755421767.mp3_10466515.mpeg',
+    shrineTheme: '/assets/aistudio/Video_game_backgroun__4-1792755771086.mp3_d74d7c2d.mpeg',
+    pyramidTheme: '/assets/aistudio/Video_game_backgroun__2-1792755895102.mp3_1257ac81.mpeg',
+  },
+  sfx: {
+    click: '/assets/aistudio/Very_short_2-second___1-1792755211416.mp3_94df93fd.mpeg',
+    chime: '/assets/aistudio/Very_short_2-second___3-1792754973342.mp3_77f5bc57.mpeg',
+    gemstone: '/assets/aistudio/Very_short_2-second___2-1792755296130.mp3_996416d2.mpeg',
+    solve: '/assets/aistudio/Very_short_2-second___2-1792755296130.mp3__1__996416d2.mpeg',
+  },
+};
+
 let audioCtx: AudioContext | null = null;
+let currentBgmAudio: HTMLAudioElement | null = null;
+let currentBgmTrack: string | null = null;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -15,141 +31,181 @@ function getAudioContext(): AudioContext | null {
     }
   }
   if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    audioCtx.resume().catch(() => {});
   }
   return audioCtx;
 }
 
+function playAudioElement(src: string, volume = 0.5) {
+  if (typeof window === 'undefined') return;
+  try {
+    const sound = new Audio(src);
+    sound.volume = volume;
+    sound.play().catch(() => {
+      // Browser autoplay policy might block before interaction
+    });
+  } catch {
+    // fallback gracefully
+  }
+}
+
+export const bgmManager = {
+  currentTrack: currentBgmTrack,
+  volume: 0.35,
+
+  play(track: keyof typeof AUDIO_TRACKS.bgm | string, enabled = true) {
+    if (!enabled || typeof window === 'undefined') return;
+
+    const trackSrc = AUDIO_TRACKS.bgm[track as keyof typeof AUDIO_TRACKS.bgm] || track;
+
+    if (currentBgmAudio && currentBgmTrack === trackSrc && !currentBgmAudio.paused) {
+      return; // Already playing this track
+    }
+
+    try {
+      if (currentBgmAudio) {
+        currentBgmAudio.pause();
+        currentBgmAudio.currentTime = 0;
+      }
+
+      currentBgmAudio = new Audio(trackSrc);
+      currentBgmAudio.loop = true;
+      currentBgmAudio.volume = this.volume;
+      currentBgmTrack = trackSrc;
+
+      currentBgmAudio.play().catch(() => {
+        // Will auto-resume on first click
+      });
+    } catch {
+      // Audio element creation fallback
+    }
+  },
+
+  pause() {
+    if (currentBgmAudio) {
+      currentBgmAudio.pause();
+    }
+  },
+
+  resume(enabled = true) {
+    if (!enabled || !currentBgmAudio) return;
+    currentBgmAudio.play().catch(() => {});
+  },
+
+  stop() {
+    if (currentBgmAudio) {
+      currentBgmAudio.pause();
+      currentBgmAudio.currentTime = 0;
+      currentBgmAudio = null;
+      currentBgmTrack = null;
+    }
+  },
+
+  setVolume(vol: number) {
+    this.volume = Math.max(0, Math.min(1, vol));
+    if (currentBgmAudio) {
+      currentBgmAudio.volume = this.volume;
+    }
+  },
+};
+
 export const soundManager = {
   /**
-   * Quick menu navigation blip
+   * Hover blip
    */
   playHover(enabled = true) {
     if (!enabled) return;
     const ctx = getAudioContext();
     if (!ctx) return;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(440, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.04);
-    
-    gain.gain.setValueAtTime(0.04, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.04);
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.03);
+      gain.gain.setValueAtTime(0.03, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.03);
+    } catch {}
   },
 
   /**
-   * Button click / confirmation chime
+   * Click / confirmation chime
    */
   playClick(enabled = true) {
     if (!enabled) return;
+    playAudioElement(AUDIO_TRACKS.sfx.click, 0.4);
+
     const ctx = getAudioContext();
     if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.05); // A5
-
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.14);
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(600, ctx.currentTime);
+      osc.frequency.setValueAtTime(900, ctx.currentTime + 0.04);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    } catch {}
   },
 
   /**
-   * Start adventure heroic arpeggio
+   * Start adventure chime
    */
   playStartAdventure(enabled = true) {
     if (!enabled) return;
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50]; // C Major
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const startTime = ctx.currentTime + idx * 0.07;
-
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(freq, startTime);
-
-      gain.gain.setValueAtTime(0.09, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.18);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.18);
-    });
+    playAudioElement(AUDIO_TRACKS.sfx.chime, 0.6);
   },
 
   /**
-   * Map travel / civilization entry chime
+   * Travel transition
    */
   playTravel(enabled = true) {
     if (!enabled) return;
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(220, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.25);
-
-    gain.gain.setValueAtTime(0.14, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.35);
+    playAudioElement(AUDIO_TRACKS.sfx.click, 0.5);
   },
 
   /**
-   * Ancient relic / puzzle solve chime
+   * Gemstone earned chime
+   */
+  playGemstoneEarned(enabled = true) {
+    if (!enabled) return;
+    playAudioElement(AUDIO_TRACKS.sfx.gemstone, 0.7);
+
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    try {
+      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = ctx.currentTime + i * 0.07;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.35);
+      });
+    } catch {}
+  },
+
+  /**
+   * Puzzle solve chime
    */
   playSolve(enabled = true) {
     if (!enabled) return;
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const chords = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-    chords.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const t = ctx.currentTime + i * 0.08;
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, t);
-
-      gain.gain.setValueAtTime(0.15, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(t);
-      osc.stop(t + 0.4);
-    });
+    playAudioElement(AUDIO_TRACKS.sfx.solve, 0.7);
   },
 
   /**
@@ -159,74 +215,42 @@ export const soundManager = {
     if (!enabled) return;
     const ctx = getAudioContext();
     if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(740, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.08);
-
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.08);
-  },
-
-  /**
-   * Sound test chime when user clicks "SOUND ON"
-   */
-  playSoundTest() {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const notes = [440, 554.37, 659.25]; // A major
-    notes.forEach((freq, i) => {
+    try {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const t = ctx.currentTime + i * 0.06;
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, t);
-
-      gain.gain.setValueAtTime(0.1, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(700, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(450, ctx.currentTime + 0.06);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
       osc.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.start(t);
-      osc.stop(t + 0.15);
-    });
+      osc.start();
+      osc.stop(ctx.currentTime + 0.06);
+    } catch {}
   },
 
-  /**
-   * Cancel or back button sound
-   */
+  playSoundTest() {
+    this.playGemstoneEarned(true);
+  },
+
   playCancel(enabled = true) {
     if (!enabled) return;
     const ctx = getAudioContext();
     if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(440, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.12);
-
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(400, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+    } catch {}
   },
 
   /**
@@ -236,139 +260,114 @@ export const soundManager = {
     if (!enabled) return;
     const ctx = getAudioContext();
     if (!ctx) return;
+    try {
+      const frequencies = [440.0, 554.37, 659.25, 880.0];
+      const baseFreq = frequencies[bellIndex % frequencies.length];
 
-    const frequencies = [440.0, 554.37, 659.25, 880.0]; // A4, C#5, E5, A5
-    const baseFreq = frequencies[bellIndex % frequencies.length];
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    // Dual-harmonic bell synthesis (fundamental + metallic overtone)
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gain = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(baseFreq * 2.76, ctx.currentTime);
 
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
 
-    osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(baseFreq * 2.76, ctx.currentTime); // metallic overtone
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
 
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
-
-    osc1.connect(gain);
-    osc2.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc1.start();
-    osc2.start();
-    osc1.stop(ctx.currentTime + 0.65);
-    osc2.stop(ctx.currentTime + 0.65);
+      osc1.start();
+      osc2.start();
+      osc1.stop(ctx.currentTime + 0.8);
+      osc2.stop(ctx.currentTime + 0.8);
+    } catch {}
   },
 
-  /**
-   * Shoji sliding screen sound
-   */
   playSlide(enabled = true) {
     if (!enabled) return;
     const ctx = getAudioContext();
     if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(180, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.09);
-
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.09);
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(160, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.07, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+    } catch {}
   },
 
-  /**
-   * Stone tile / constellation tile rotation
-   */
   playRotateTile(enabled = true) {
     if (!enabled) return;
     const ctx = getAudioContext();
     if (!ctx) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(520, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(320, ctx.currentTime + 0.06);
-
-    gain.gain.setValueAtTime(0.09, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.06);
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(500, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(320, ctx.currentTime + 0.05);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.05);
+    } catch {}
   },
 
-  /**
-   * Water flowing through aqueduct pipe
-   */
+  playGateOpen(enabled = true) {
+    if (!enabled) return;
+    playAudioElement(AUDIO_TRACKS.sfx.solve, 0.8);
+  },
+
   playWaterFlow(enabled = true) {
     if (!enabled) return;
     const ctx = getAudioContext();
     if (!ctx) return;
-
-    const notes = [587.33, 659.25, 880.0, 1046.5];
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const t = ctx.currentTime + idx * 0.08;
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, t);
-
-      gain.gain.setValueAtTime(0.12, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(t);
-      osc.stop(t + 0.25);
-    });
+    try {
+      const notes = [587.33, 659.25, 880.0, 1046.5];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = ctx.currentTime + idx * 0.06;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.09, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.2);
+      });
+    } catch {}
   },
 
-  /**
-   * Monumental gateway opening
-   */
-  playGateOpen(enabled = true) {
+  playSnapKeystone(enabled = true) {
     if (!enabled) return;
     const ctx = getAudioContext();
     if (!ctx) return;
-
-    const chords = [130.81, 196.0, 261.63, 392.0]; // C3 power chord
-    chords.forEach((freq, i) => {
+    try {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const t = ctx.currentTime + i * 0.1;
-
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, t);
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, t + 0.8);
-
-      gain.gain.setValueAtTime(0.15, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
-
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
       osc.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.start(t);
-      osc.stop(t + 0.8);
-    });
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } catch {}
   },
 };
-

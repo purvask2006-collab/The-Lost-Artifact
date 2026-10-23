@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Sparkles, Map, KeyRound, Award, Disc } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { X, Check } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface HowToPlayModalProps {
@@ -17,108 +18,75 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose,
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs">
-      <div 
-        className="w-full max-w-2xl bg-zinc-900 border-4 border-amber-600/80 shadow-[0_0_24px_rgba(217,119,6,0.3)] p-6 text-zinc-100 max-h-[90vh] overflow-y-auto"
-        role="dialog"
-        aria-labelledby="modal-title"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-4 mb-5">
-          <div className="flex items-center gap-3">
-            <span className="text-amber-500 font-pixel text-lg">✦</span>
-            <h2 id="modal-title" className="text-lg md:text-xl font-pixel text-amber-400 tracking-wide">
-              EXPEDITION CODEX
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs select-none">
+        <motion.div 
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          className="w-full max-w-lg bg-[#1a1528] border-3 border-[#e8b84a] shadow-[0_0_30px_rgba(0,0,0,0.9)] p-6 text-[#e3dfb1]"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b-2 border-[#3a334a] pb-3 mb-5">
+            <h2 className="font-pixel text-[18px] text-[#e8b84a] tracking-wider">
+              HOW TO PLAY
             </h2>
-          </div>
-          <button
-            onClick={handleClose}
-            className="p-1 border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
-            aria-label="Close rules"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content sections */}
-        <div className="space-y-6 text-sm md:text-base leading-relaxed text-zinc-300">
-          <div>
-            <h3 className="text-amber-400 font-silkscreen font-bold flex items-center gap-2 mb-2">
-              <Map className="w-4 h-4 text-amber-500" />
-              1. THE THREE CIVILIZATIONS
-            </h3>
-            <p className="text-zinc-400 text-xs md:text-sm">
-              Journey freely across the ancient world map between <strong className="text-amber-300">India (The Indus Sanctum)</strong>, <strong className="text-sky-300">Japan (The Whispering Shrines)</strong>, and <strong className="text-yellow-300">Egypt (The Sunken Necropolis)</strong>. No combat, no hazards—only logic and ancient riddles.
-            </p>
+            <button
+              onClick={handleClose}
+              className="p-1 border border-[#676b76] bg-[#241d33] hover:border-[#ffffff] text-[#e3dfb1] cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-3 bg-zinc-950/70 border border-zinc-800">
-              <div className="flex items-center gap-2 text-amber-300 font-bold mb-1 text-xs">
-                <KeyRound className="w-4 h-4 text-amber-400" />
-                SIX LOGIC PUZZLES
+          {/* Visual Step-by-Step (Show, don't tell) */}
+          <div className="space-y-4 font-silkscreen text-[15px]">
+            {/* Step 1 */}
+            <div className="flex items-center gap-3 p-3 bg-[#120e1c] border-2 border-[#676b76]">
+              <span className="w-10 h-10 border-2 border-[#f59e0b] bg-[#241a12] flex items-center justify-center text-xl shrink-0">
+                🧩
+              </span>
+              <div>
+                <div className="font-pixel text-[13px] text-[#fef08a]">1. SOLVE CHAMBERS</div>
+                <div className="text-[14px] text-[#e3dfb1]/80">Restore ancient logic patterns.</div>
               </div>
-              <p className="text-zinc-400 text-xs">
-                Each civilization houses two distinct puzzle chambers. Solve them through deductive pattern recognition, celestial alignment, and balanced mechanisms.
-              </p>
             </div>
 
-            <div className="p-3 bg-zinc-950/70 border border-zinc-800">
-              <div className="flex items-center gap-2 text-amber-300 font-bold mb-1 text-xs">
-                <Award className="w-4 h-4 text-amber-400" />
-                SIX SACRED RELICS
+            {/* Step 2 */}
+            <div className="flex items-center gap-3 p-3 bg-[#120e1c] border-2 border-[#676b76]">
+              <span className="w-10 h-10 border-2 border-[#f472b6] bg-[#2a1728] flex items-center justify-center text-xl shrink-0">
+                💎
+              </span>
+              <div>
+                <div className="font-pixel text-[13px] text-[#fef08a]">2. COLLECT 12 GEM KEYS</div>
+                <div className="text-[14px] text-[#e3dfb1]/80">4 gemstone keys per civilization.</div>
               </div>
-              <p className="text-zinc-400 text-xs">
-                Every solved puzzle awards a sacred archaeological relic (Gnomon, Lotus Gem, Shakuhachi, Magatama, Scarab, and Ankh).
-              </p>
             </div>
-          </div>
 
-          <div>
-            <h3 className="text-amber-400 font-silkscreen font-bold flex items-center gap-2 mb-2">
-              <Disc className="w-4 h-4 text-amber-500" />
-              2. ANCIENT MECHANISMS & FRAGMENTS
-            </h3>
-            <p className="text-zinc-400 text-xs md:text-sm">
-              Each civilization features a monumental mechanism (Solar Chakra Engine, Torii Spirit Gate, and Ankh Keystone). When you have conquered both local puzzle chambers, activate the mechanism to claim its artifact fragment:
-            </p>
-            <div className="mt-3 flex flex-col gap-2 font-pixel text-xs text-zinc-300 pl-2">
-              <div className="flex items-center gap-2">
-                <span className="text-amber-400">☸</span>
-                <span>Fragment of the Solar Wheel (India)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-400">⛩</span>
-                <span>Fragment of the Celestial Mirror (Japan)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-yellow-400">𓁹</span>
-                <span>Fragment of the Eternal Eye (Egypt)</span>
+            {/* Step 3 */}
+            <div className="flex items-center gap-3 p-3 bg-[#120e1c] border-2 border-[#676b76]">
+              <span className="w-10 h-10 border-2 border-[#06b6d4] bg-[#12232e] flex items-center justify-center text-xl shrink-0">
+                ☸
+              </span>
+              <div>
+                <div className="font-pixel text-[13px] text-[#fef08a]">3. UNLOCK MECHANISMS</div>
+                <div className="text-[14px] text-[#e3dfb1]/80">Socket 4 gems to claim 3 fragments.</div>
               </div>
             </div>
           </div>
 
-          <div>
-            <h3 className="text-amber-400 font-silkscreen font-bold flex items-center gap-2 mb-2">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              3. FINAL RECONSTRUCTION
-            </h3>
-            <p className="text-zinc-400 text-xs md:text-sm">
-              Assemble all three recovered fragments upon the sacred central pedestal to decipher the lost ancient truth. Your expedition progress is auto-saved locally at all times.
-            </p>
+          {/* Footer */}
+          <div className="mt-5 pt-4 border-t-2 border-[#3a334a] flex justify-end">
+            <button
+              onClick={handleClose}
+              className="pixel-btn pixel-btn-primary min-h-[44px] px-6 text-[14px] flex items-center gap-2 cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              <span>PLAY</span>
+            </button>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-6 pt-4 border-t-2 border-zinc-800 flex justify-end">
-          <button
-            onClick={handleClose}
-            className="px-6 py-2 bg-amber-600 hover:bg-amber-500 text-zinc-950 font-pixel text-xs tracking-wider border-2 border-amber-400 transition-colors"
-          >
-            UNDERSTOOD
-          </button>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 };

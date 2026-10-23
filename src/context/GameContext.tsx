@@ -5,10 +5,11 @@ import {
   PuzzleId, 
   MechanismId, 
   FragmentId, 
+  GemstoneId,
   GameState 
 } from '../types/game';
-import { CIVILIZATIONS } from '../data/gameData';
-import { soundManager } from '../utils/audio';
+import { CIVILIZATIONS, GEMSTONES } from '../data/gameData';
+import { soundManager, bgmManager } from '../utils/audio';
 
 interface GameContextType {
   state: GameState;
@@ -22,14 +23,16 @@ interface GameContextType {
   openChamber: (puzzleId: PuzzleId) => void;
   openMechanism: (mechanismId: MechanismId) => void;
   toggleSound: () => void;
+  toggleMusic: () => void;
   toggleCrtFilter: () => void;
   resetGame: () => void;
   solvePuzzle: (puzzleId: PuzzleId) => void;
+  socketGemstone: (mechanismId: MechanismId, gemstoneId: GemstoneId) => void;
   unlockMechanism: (mechanismId: MechanismId) => void;
   assembleFinalArtifact: () => void;
 }
 
-const STORAGE_KEY = 'the_lost_artifact_save_v1';
+const STORAGE_KEY = 'the_lost_artifact_save_v2';
 
 const INITIAL_STATE: GameState = {
   currentScreen: 'TITLE',
@@ -39,23 +42,52 @@ const INITIAL_STATE: GameState = {
 
   unlockedCivs: {
     india: true,
-    japan: false, // Unlocks after India's Chakra mechanism is activated
-    egypt: false, // Unlocks after Japan's shrine mechanism is activated
+    japan: false, // Unlocks after India's Chakra reveals Fragment 1
+    egypt: false, // Unlocks after Japan's Shrine reveals Fragment 2
   },
+
   solvedPuzzles: {
     india_puzzle_1: false,
     india_puzzle_2: false,
+    india_puzzle_3: false,
+    india_puzzle_4: false,
     japan_puzzle_1: false,
     japan_puzzle_2: false,
+    japan_puzzle_3: false,
+    japan_puzzle_4: false,
     egypt_puzzle_1: false,
     egypt_puzzle_2: false,
+    egypt_puzzle_3: false,
+    egypt_puzzle_4: false,
   },
-  collectedRewards: {},
+
+  collectedGemstones: {
+    ruby: false,
+    emerald: false,
+    sapphire: false,
+    citrine: false,
+    rose_quartz: false,
+    moonstone: false,
+    amethyst: false,
+    obsidian: false,
+    lapis_lazuli: false,
+    turquoise: false,
+    carnelian: false,
+    malachite: false,
+  },
+
+  socketedGemstones: {
+    india_mechanism: [],
+    japan_mechanism: [],
+    egypt_mechanism: [],
+  },
+
   unlockedMechanisms: {
     india_mechanism: false,
     japan_mechanism: false,
     egypt_mechanism: false,
   },
+
   recoveredFragments: {
     fragment_solar_wheel: false,
     fragment_celestial_mirror: false,
@@ -66,7 +98,8 @@ const INITIAL_STATE: GameState = {
   gameCompleted: false,
 
   soundEnabled: true,
-  crtFilterEnabled: true,
+  musicEnabled: true,
+  crtFilterEnabled: false, // Clean retro display without over-darkening
 
   hasStarted: false,
   lastSavedAt: null,
@@ -83,13 +116,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (saved) {
         const parsed = JSON.parse(saved);
         const mechs = parsed.unlockedMechanisms || {};
+        const frags = parsed.recoveredFragments || {};
         return {
           ...INITIAL_STATE,
           ...parsed,
           unlockedCivs: {
             india: true,
-            japan: Boolean(mechs.india_mechanism),
-            egypt: Boolean(mechs.japan_mechanism),
+            japan: Boolean(frags.fragment_solar_wheel || mechs.india_mechanism),
+            egypt: Boolean(frags.fragment_celestial_mirror || mechs.japan_mechanism),
           },
           currentScreen: 'TITLE',
         };
@@ -114,7 +148,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return false;
   });
 
-  // Save progress helper
   const persistState = useCallback((nextState: GameState) => {
     try {
       const toSave = {
@@ -128,7 +161,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // Update playtime tick
+  // Playtime counter
   useEffect(() => {
     if (state.currentScreen === 'TITLE') return;
     const interval = setInterval(() => {
@@ -139,6 +172,28 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, 1000);
     return () => clearInterval(interval);
   }, [state.currentScreen]);
+
+  // Screen music synchronization
+  useEffect(() => {
+    if (!state.musicEnabled) {
+      bgmManager.pause();
+      return;
+    }
+
+    if (state.currentScreen === 'TITLE' || state.currentScreen === 'WORLD_MAP') {
+      bgmManager.play('mainTheme', true);
+    } else if (state.currentScreen === 'CIV_HUB' || state.currentScreen === 'PUZZLE' || state.currentScreen === 'MECHANISM') {
+      if (state.selectedCiv === 'japan') {
+        bgmManager.play('shrineTheme', true);
+      } else if (state.selectedCiv === 'egypt') {
+        bgmManager.play('pyramidTheme', true);
+      } else {
+        bgmManager.play('mainTheme', true);
+      }
+    } else if (state.currentScreen === 'ASSEMBLY' || state.currentScreen === 'COMPLETION') {
+      bgmManager.play('shrineTheme', true);
+    }
+  }, [state.currentScreen, state.selectedCiv, state.musicEnabled]);
 
   const startAdventure = useCallback(() => {
     soundManager.playStartAdventure(state.soundEnabled);
@@ -161,6 +216,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (saved) {
         const parsed = JSON.parse(saved);
         setState({
+          ...INITIAL_STATE,
           ...parsed,
           currentScreen: 'WORLD_MAP',
         });
@@ -169,7 +225,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) {
       console.warn('Failed to load continue state', e);
     }
-    // Fallback if no valid save
     startAdventure();
   }, [state.soundEnabled, startAdventure]);
 
@@ -268,6 +323,20 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   }, [persistState]);
 
+  const toggleMusic = useCallback(() => {
+    setState(prev => {
+      const nextMusic = !prev.musicEnabled;
+      if (!nextMusic) {
+        bgmManager.pause();
+      } else {
+        bgmManager.resume(true);
+      }
+      const next = { ...prev, musicEnabled: nextMusic };
+      persistState(next);
+      return next;
+    });
+  }, [persistState]);
+
   const toggleCrtFilter = useCallback(() => {
     soundManager.playToggle(state.soundEnabled);
     setState(prev => {
@@ -282,26 +351,74 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch (e) {
-      console.warn('Failed to clear local storage', e);
+      console.warn('Failed to clear storage', e);
     }
     setState(INITIAL_STATE);
     setHasSavedGame(false);
   }, [state.soundEnabled]);
 
   const solvePuzzle = useCallback((puzzleId: PuzzleId) => {
-    soundManager.playSolve(state.soundEnabled);
+    soundManager.playGemstoneEarned(state.soundEnabled);
     setState(prev => {
-      const civ = CIVILIZATIONS[prev.selectedCiv || 'india'];
-      const pInfo = civ.puzzles.find(p => p.id === puzzleId);
+      // Find the associated gemstone
+      const gemstoneEntry = Object.values(GEMSTONES).find(g => g.earnedFromPuzzleId === puzzleId);
       const nextSolved = { ...prev.solvedPuzzles, [puzzleId]: true };
-      const nextRewards = { ...prev.collectedRewards };
-      if (pInfo) {
-        nextRewards[pInfo.reward.id] = true;
+      const nextGems = { ...prev.collectedGemstones };
+      if (gemstoneEntry) {
+        nextGems[gemstoneEntry.id] = true;
       }
+
       const next: GameState = {
         ...prev,
         solvedPuzzles: nextSolved,
-        collectedRewards: nextRewards,
+        collectedGemstones: nextGems,
+      };
+      persistState(next);
+      return next;
+    });
+  }, [state.soundEnabled, persistState]);
+
+  const socketGemstone = useCallback((mechanismId: MechanismId, gemstoneId: GemstoneId) => {
+    soundManager.playSnapKeystone(state.soundEnabled);
+    setState(prev => {
+      const currentList = prev.socketedGemstones[mechanismId] || [];
+      if (currentList.includes(gemstoneId)) return prev;
+
+      const nextList = [...currentList, gemstoneId];
+      const nextSockets = {
+        ...prev.socketedGemstones,
+        [mechanismId]: nextList,
+      };
+
+      // Check if all 4 required gemstones are now slotted
+      const civ = Object.values(CIVILIZATIONS).find(c => c.mechanism.id === mechanismId);
+      const isComplete = civ ? civ.mechanism.requiredGemstones.every(g => nextList.includes(g)) : false;
+
+      let nextMechs = prev.unlockedMechanisms;
+      let nextFrags = prev.recoveredFragments;
+      let nextUnlockedCivs = prev.unlockedCivs;
+
+      if (isComplete && !prev.unlockedMechanisms[mechanismId]) {
+        soundManager.playGateOpen(state.soundEnabled);
+        nextMechs = { ...prev.unlockedMechanisms, [mechanismId]: true };
+        if (civ) {
+          nextFrags = { ...prev.recoveredFragments, [civ.fragmentId]: true };
+        }
+
+        // Progression unlocks
+        nextUnlockedCivs = {
+          india: true,
+          japan: Boolean(nextMechs.india_mechanism || nextFrags.fragment_solar_wheel),
+          egypt: Boolean(nextMechs.japan_mechanism || nextFrags.fragment_celestial_mirror),
+        };
+      }
+
+      const next: GameState = {
+        ...prev,
+        socketedGemstones: nextSockets,
+        unlockedMechanisms: nextMechs,
+        recoveredFragments: nextFrags,
+        unlockedCivs: nextUnlockedCivs,
       };
       persistState(next);
       return next;
@@ -311,15 +428,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const unlockMechanism = useCallback((mechanismId: MechanismId) => {
     soundManager.playSolve(state.soundEnabled);
     setState(prev => {
-      const civ = CIVILIZATIONS[prev.selectedCiv || 'india'];
-      const fragId = civ.fragmentId;
+      const civ = Object.values(CIVILIZATIONS).find(c => c.mechanism.id === mechanismId);
       const nextMechs = { ...prev.unlockedMechanisms, [mechanismId]: true };
-      const nextFrags = { ...prev.recoveredFragments, [fragId]: true };
+      let nextFrags = prev.recoveredFragments;
+      if (civ) {
+        nextFrags = { ...prev.recoveredFragments, [civ.fragmentId]: true };
+      }
 
       const nextUnlockedCivs = {
         india: true,
-        japan: Boolean(nextMechs.india_mechanism),
-        egypt: Boolean(nextMechs.japan_mechanism),
+        japan: Boolean(nextMechs.india_mechanism || nextFrags.fragment_solar_wheel),
+        egypt: Boolean(nextMechs.japan_mechanism || nextFrags.fragment_celestial_mirror),
       };
 
       const allRecovered = Object.values(nextFrags).every(Boolean);
@@ -364,9 +483,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         openChamber,
         openMechanism,
         toggleSound,
+        toggleMusic,
         toggleCrtFilter,
         resetGame,
         solvePuzzle,
+        socketGemstone,
         unlockMechanism,
         assembleFinalArtifact,
       }}
