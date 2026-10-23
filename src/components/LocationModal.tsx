@@ -1,8 +1,10 @@
 import React from 'react';
-import { useGame } from '../context/GameContext';
 import { CIVILIZATIONS } from '../data/gameData';
 import { CivilizationId, PuzzleId, MechanismId } from '../types/game';
 import { FragmentPixelBadge } from './PixelArtwork';
+import { IndianPriestessSprite } from './IndianPriestessSprite';
+import { YukiShrineOracle } from './japan/YukiShrineOracle';
+import { KiyaHorizonWatcher } from './egypt/KiyaHorizonWatcher';
 import { 
   X, 
   Lock, 
@@ -11,7 +13,8 @@ import {
   KeyRound, 
   Cog, 
   ArrowRight,
-  AlertCircle
+  AlertCircle,
+  Play
 } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
@@ -34,6 +37,7 @@ interface LocationModalProps {
   onClose: () => void;
   onSolvePuzzle: (puzzleId: PuzzleId) => void;
   onUnlockMechanism: (mechanismId: MechanismId) => void;
+  onEnterLocation?: (civId: CivilizationId, type: 'puzzle' | 'mechanism', id: PuzzleId | MechanismId) => void;
   soundEnabled: boolean;
 }
 
@@ -42,6 +46,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   onClose,
   onSolvePuzzle,
   onUnlockMechanism,
+  onEnterLocation,
   soundEnabled,
 }) => {
   if (!location) return null;
@@ -54,12 +59,16 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     onClose();
   };
 
-  const handleAction = () => {
-    if (location.status !== 'available') return;
-    if (isMechanism) {
-      onUnlockMechanism(location.id as MechanismId);
+  const handleEnter = () => {
+    soundManager.playTravel(soundEnabled);
+    if (onEnterLocation) {
+      onEnterLocation(location.civId, location.type, location.id);
     } else {
-      onSolvePuzzle(location.id as PuzzleId);
+      if (isMechanism) {
+        onUnlockMechanism(location.id as MechanismId);
+      } else {
+        onSolvePuzzle(location.id as PuzzleId);
+      }
     }
   };
 
@@ -132,6 +141,55 @@ export const LocationModal: React.FC<LocationModalProps> = ({
           {location.description}
         </p>
 
+        {/* Companion Lore Guidance */}
+        {location.civId === 'india' && (
+          <div className="p-3 bg-amber-950/40 border-2 border-amber-600/70 mb-4 flex items-center gap-3">
+            <div className="shrink-0">
+              <IndianPriestessSprite size="sm" direction="south" />
+            </div>
+            <div>
+              <div className="text-[10px] text-amber-400 font-pixel">PRIESTESS ANANYA'S GUIDANCE:</div>
+              <p className="text-xs text-amber-200 font-silkscreen italic">
+                {location.id === 'india_puzzle_1' && '“The courtyard paving stones have drifted through the ages. Follow the concentric rays.”'}
+                {location.id === 'india_puzzle_2' && '“Kindle the sacred fires in true Vedic order. Flame must answer to spirit.”'}
+                {location.id === 'india_mechanism' && '“Only with both relics can the great Chakra turn and yield the Solar Wheel.”'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {location.civId === 'japan' && (
+          <div className="p-3 bg-sky-950/40 border-2 border-sky-600/70 mb-4 flex items-center gap-3">
+            <div className="shrink-0">
+              <YukiShrineOracle size="sm" />
+            </div>
+            <div>
+              <div className="text-[10px] text-sky-400 font-pixel">SHRINE ORACLE YUKI'S GUIDANCE:</div>
+              <p className="text-xs text-sky-200 font-silkscreen italic">
+                {location.id === 'japan_puzzle_1' && '“Slide the delicate painted paper screens to connect the spirit orb to the shrine lantern.”'}
+                {location.id === 'japan_puzzle_2' && '“Echo the wind kami’s chime cadence across the four temple bells.”'}
+                {location.id === 'japan_mechanism' && '“Slot both Spirit Seals upon the shrine altar to open the monumental Torii gate.”'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {location.civId === 'egypt' && (
+          <div className="p-3 bg-yellow-950/40 border-2 border-yellow-600/70 mb-4 flex items-center gap-3">
+            <div className="shrink-0">
+              <KiyaHorizonWatcher size="sm" />
+            </div>
+            <div>
+              <div className="text-[10px] text-yellow-400 font-pixel">HORIZON WATCHER KIYA'S GUIDANCE:</div>
+              <p className="text-xs text-yellow-200 font-silkscreen italic">
+                {location.id === 'egypt_puzzle_1' && '“Rotate the fallen ceiling slabs to restore the constellation lines from Sirius to the zenith.”'}
+                {location.id === 'egypt_puzzle_2' && '“Water must flow from the Nile spring without leaking; rotate the pipes into the turquoise basin.”'}
+                {location.id === 'egypt_mechanism' && '“Place both Sun Symbols into the golden cartouches to slide open the Pyramid of Secrets.”'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Riddle (for puzzles) */}
         {location.riddle && (
           <div className="p-3 bg-amber-950/20 border border-amber-900/60 mb-4">
@@ -201,9 +259,18 @@ export const LocationModal: React.FC<LocationModalProps> = ({
           </button>
 
           {location.status === 'completed' && (
-            <div className="font-pixel text-xs text-emerald-400 flex items-center gap-1.5 py-2">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>CHAMBER CLEARED</span>
+            <div className="flex items-center gap-3">
+              <div className="font-pixel text-xs text-emerald-400 flex items-center gap-1.5 py-1">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>CLEARED</span>
+              </div>
+              <button
+                onClick={handleEnter}
+                className="pixel-btn px-3 py-1.5 border-2 border-emerald-600 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 font-pixel text-xs flex items-center gap-1.5"
+              >
+                <Play className="w-3.5 h-3.5" />
+                <span>REPLAY</span>
+              </button>
             </div>
           )}
 
@@ -216,11 +283,11 @@ export const LocationModal: React.FC<LocationModalProps> = ({
 
           {location.status === 'available' && (
             <button
-              onClick={handleAction}
+              onClick={handleEnter}
               className="pixel-btn px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-pixel text-xs font-bold border-2 border-amber-300 shadow-[0_3px_0_#92400e] flex items-center gap-2 transition-colors"
             >
-              <span>{isMechanism ? 'ACTIVATE MECHANISM' : 'SOLVE PUZZLE'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <Play className="w-4 h-4 fill-current" />
+              <span>{isMechanism ? 'ENTER MECHANISM VAULT' : 'ENTER & PLAY CHAMBER'}</span>
             </button>
           )}
         </div>

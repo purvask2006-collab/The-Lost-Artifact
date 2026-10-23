@@ -6,7 +6,7 @@ import { HowToPlayModal } from './HowToPlayModal';
 import { ResetConfirmModal } from './ResetConfirmModal';
 import { InventoryModal } from './InventoryModal';
 import { FragmentPixelBadge } from './PixelArtwork';
-import { PuzzleId, MechanismId } from '../types/game';
+import { CivilizationId, PuzzleId, MechanismId } from '../types/game';
 import { 
   ArrowLeft, 
   Volume2, 
@@ -31,7 +31,10 @@ export const WorldMap: React.FC = () => {
     resetGame,
     goToScreen,
     solvePuzzle,
-    unlockMechanism 
+    unlockMechanism,
+    selectCivilization,
+    openChamber,
+    openMechanism
   } = useGame();
 
   const [activeLocationId, setActiveLocationId] = useState<string>('india_puzzle_1');
@@ -71,6 +74,16 @@ export const WorldMap: React.FC = () => {
         ...selectedLocation,
         status: 'completed',
       });
+    }
+  };
+
+  const handleEnterLocation = (civId: CivilizationId, type: 'puzzle' | 'mechanism', id: PuzzleId | MechanismId) => {
+    setSelectedLocation(null);
+    selectCivilization(civId);
+    if (type === 'mechanism') {
+      openMechanism(id as MechanismId);
+    } else {
+      openChamber(id as PuzzleId);
     }
   };
 
@@ -258,6 +271,7 @@ export const WorldMap: React.FC = () => {
         onClose={() => setSelectedLocation(null)}
         onSolvePuzzle={handleSolvePuzzle}
         onUnlockMechanism={handleUnlockMechanism}
+        onEnterLocation={handleEnterLocation}
         soundEnabled={state.soundEnabled}
       />
 

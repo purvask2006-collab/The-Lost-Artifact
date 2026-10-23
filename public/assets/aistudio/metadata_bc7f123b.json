@@ -1,0 +1,36 @@
+{
+  "group_id": "ec366025-21a0-46bf-9564-36b9428c8d05",
+  "states": [
+    {
+      "character": {
+        "id": "3c470432-51fe-43ef-936e-feee7b623a08",
+        "name": "Idle",
+        "prompt": "Tiny chibi pixel art sprite of a young Indian priestess, big head small body, 32x32 or 64x64 retro game sprite style, ochre and deep indigo robe with thin gold trim, heavy brass armlets, sandalwood-paste-stained palms, hair in a severe tight bun with a red cloth band, holding a small copper offering bowl and a sacred measuring cord, calm mystical expression, soft glowing geometric mandala pattern faintly visible beneath her feet, standing on a floating circular stone altar platform with cracked marble texture, vibrant limited color palette with warm golds and cool indigos, clean black outline, dithered shadows, cute anime-influenced face with large expressive eyes, side-facing 3/4 view, transparent background, indie game asset style, sharp readable silhouette, PixelLab aesthetic",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-10-23T10:39:39.610997+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-23T10:44:15.707932"
+}

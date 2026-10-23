@@ -20,6 +20,8 @@ const GameShell: React.FC = () => {
       case 'WORLD_MAP':
         return <WorldMap />;
       case 'CIV_HUB':
+      case 'PUZZLE':
+      case 'MECHANISM':
         return <CivHub />;
       case 'ASSEMBLY':
       case 'COMPLETION':

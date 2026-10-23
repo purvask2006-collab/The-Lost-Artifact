@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 import { CIVILIZATIONS } from '../data/gameData';
 import { CivilizationId, PuzzleId, MechanismId } from '../types/game';
 import { LocationTarget } from './LocationModal';
+import { PRIESTESS_SPRITES, SpriteDirection } from './IndianPriestessSprite';
 import { soundManager } from '../utils/audio';
 
 interface PixelOverworldMapProps {
@@ -16,6 +17,8 @@ export const PixelOverworldMap: React.FC<PixelOverworldMapProps> = ({
 }) => {
   const { state } = useGame();
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [playerDirection, setPlayerDirection] = useState<SpriteDirection>('south');
+  const [prevPos, setPrevPos] = useState<{ x: number; y: number }>({ x: 500, y: 470 });
 
   // Progression checks
   const isIndiaMechanismUnlocked = state.unlockedMechanisms.india_mechanism;
@@ -98,6 +101,29 @@ export const PixelOverworldMap: React.FC<PixelOverworldMapProps> = ({
   // Determine active player marker position
   const activeLocId = activeLocationId || 'india_puzzle_1';
   const playerPos = locationCoords[activeLocId] || { x: 500, y: 470 };
+
+  // Calculate direction angle when traveling between nodes
+  useEffect(() => {
+    const nextPos = locationCoords[activeLocId] || { x: 500, y: 470 };
+    const dx = nextPos.x - prevPos.x;
+    const dy = nextPos.y - prevPos.y;
+
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      const angle = (Math.atan2(dy, dx) * 180) / Math.PI; // -180 to 180
+      let dir: SpriteDirection = 'south';
+      if (angle >= -22.5 && angle < 22.5) dir = 'east';
+      else if (angle >= 22.5 && angle < 67.5) dir = 'south-east';
+      else if (angle >= 67.5 && angle < 112.5) dir = 'south';
+      else if (angle >= 112.5 && angle < 157.5) dir = 'south-west';
+      else if (angle >= 157.5 || angle < -157.5) dir = 'west';
+      else if (angle >= -157.5 && angle < -112.5) dir = 'north-west';
+      else if (angle >= -112.5 && angle < -67.5) dir = 'north';
+      else if (angle >= -67.5 && angle < -22.5) dir = 'north-east';
+
+      setPlayerDirection(dir);
+      setPrevPos(nextPos);
+    }
+  }, [activeLocId, prevPos.x, prevPos.y]);
 
   return (
     <div className="relative w-full aspect-[16/9] max-h-[72vh] min-h-[420px] bg-[#0c0d12] border-4 border-amber-800/90 shadow-[0_0_35px_rgba(0,0,0,0.9)] overflow-hidden select-none">
@@ -815,35 +841,36 @@ export const PixelOverworldMap: React.FC<PixelOverworldMapProps> = ({
         </g>
 
         {/* ======================================================== */}
-        {/* ANIMATED PLAYER EXPLORER SPRITE / MARKER */}
+        {/* ANIMATED PLAYER EXPLORER SPRITE / MARKER (8-Directional) */}
         {/* ======================================================== */}
         <g
           id="player-adventurer-sprite"
-          transform={`translate(${playerPos.x - 12}, ${playerPos.y + 12})`}
+          transform={`translate(${playerPos.x}, ${playerPos.y + 14})`}
           className="transition-all duration-500 ease-out pointer-events-none"
         >
-          {/* Explorer Hat */}
-          <rect x="2" y="0" width="20" height="4" fill="#78350f" />
-          <rect x="6" y="-3" width="12" height="4" fill="#92400e" />
-          {/* Head & Face */}
-          <rect x="7" y="4" width="10" height="8" fill="#fde047" />
-          <rect x="9" y="6" width="2" height="2" fill="#18181b" />
-          <rect x="13" y="6" width="2" height="2" fill="#18181b" />
-          {/* Explorer Jacket & Pack */}
-          <rect x="6" y="12" width="12" height="10" fill="#047857" />
-          <rect x="18" y="13" width="4" height="8" fill="#78350f" />
-          {/* Boots */}
-          <rect x="7" y="22" width="4" height="6" fill="#451a03" />
-          <rect x="13" y="22" width="4" height="6" fill="#451a03" />
-          {/* Glowing Compass Beacon */}
-          <circle cx="2" cy="16" r="3" fill="#38bdf8">
-            <animate attributeName="r" values="2;4;2" dur="1s" repeatCount="indefinite" />
-          </circle>
-          {/* "YOU ARE HERE" Indicator */}
-          <rect x="1" y="-12" width="22" height="8" fill="#18181b" stroke="#f59e0b" strokeWidth="1" />
-          <text x="12" y="-6" fill="#fef08a" fontFamily="'Press Start 2P', monospace" fontSize="5" textAnchor="middle">
-            YOU
-          </text>
+          {/* Stone Altar Disc Shadow */}
+          <ellipse cx="0" cy="8" rx="15" ry="6" fill="#000000" opacity="0.6" />
+          <ellipse cx="0" cy="8" rx="11" ry="4" fill="#f59e0b" opacity="0.25">
+            <animate attributeName="rx" values="10;13;10" dur="1.8s" repeatCount="indefinite" />
+          </ellipse>
+
+          {/* Authentic 8-Directional Priestess Pixel Sprite */}
+          <image
+            href={PRIESTESS_SPRITES[playerDirection] || PRIESTESS_SPRITES['south']}
+            x="-20"
+            y="-34"
+            width="40"
+            height="40"
+            style={{ imageRendering: 'pixelated' }}
+          />
+
+          {/* "YOU ARE HERE" Beacon Indicator */}
+          <g transform="translate(0, -42)">
+            <rect x="-14" y="-8" width="28" height="11" fill="#18181b" stroke="#f59e0b" strokeWidth="1.2" />
+            <text x="0" y="-1" fill="#fef08a" fontFamily="'Press Start 2P', monospace" fontSize="5" textAnchor="middle">
+              YOU
+            </text>
+          </g>
         </g>
       </svg>
     </div>
