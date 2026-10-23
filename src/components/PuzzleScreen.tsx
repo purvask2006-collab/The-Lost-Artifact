@@ -3,10 +3,16 @@ import { useGame } from '../context/GameContext';
 import { MinimalHUD, InventoryTray, JournalModal } from './PixelUiKit';
 import { CrackedCourtyardPuzzle } from './india/CrackedCourtyardPuzzle';
 import { FiveHearthsPuzzle } from './india/FiveHearthsPuzzle';
+import { CrookedArchPuzzle } from './india/CrookedArchPuzzle';
+import { BrokenMandalaPuzzle } from './india/BrokenMandalaPuzzle';
 import { MisplacedScreenPuzzle } from './japan/MisplacedScreenPuzzle';
+import { AsymmetricGardenPuzzle } from './japan/AsymmetricGardenPuzzle';
 import { BellSequencePuzzle } from './japan/BellSequencePuzzle';
+import { DisorderedTearoomPuzzle } from './japan/DisorderedTearoomPuzzle';
 import { ScatteredCeilingPuzzle } from './egypt/ScatteredCeilingPuzzle';
 import { CrackedBasinPuzzle } from './egypt/CrackedBasinPuzzle';
+import { WanderingShadowPuzzle } from './egypt/WanderingShadowPuzzle';
+import { StarClockPuzzle } from './egypt/StarClockPuzzle';
 import { soundManager } from '../utils/audio';
 
 export const PuzzleScreen: React.FC = () => {
@@ -28,18 +34,36 @@ export const PuzzleScreen: React.FC = () => {
 
   const renderPuzzle = () => {
     switch (puzzleId) {
+      // India (4 Chambers)
       case 'india_puzzle_1':
         return <CrackedCourtyardPuzzle onBack={handleBack} />;
       case 'india_puzzle_2':
         return <FiveHearthsPuzzle onBack={handleBack} />;
+      case 'india_puzzle_3':
+        return <CrookedArchPuzzle onBack={handleBack} />;
+      case 'india_puzzle_4':
+        return <BrokenMandalaPuzzle onBack={handleBack} />;
+
+      // Japan (4 Chambers)
       case 'japan_puzzle_1':
         return <MisplacedScreenPuzzle onBack={handleBack} />;
       case 'japan_puzzle_2':
+        return <AsymmetricGardenPuzzle onBack={handleBack} />;
+      case 'japan_puzzle_3':
         return <BellSequencePuzzle onBack={handleBack} />;
+      case 'japan_puzzle_4':
+        return <DisorderedTearoomPuzzle onBack={handleBack} />;
+
+      // Egypt (4 Chambers)
       case 'egypt_puzzle_1':
         return <ScatteredCeilingPuzzle onBack={handleBack} />;
       case 'egypt_puzzle_2':
         return <CrackedBasinPuzzle onBack={handleBack} />;
+      case 'egypt_puzzle_3':
+        return <WanderingShadowPuzzle onBack={handleBack} />;
+      case 'egypt_puzzle_4':
+        return <StarClockPuzzle onBack={handleBack} />;
+
       default:
         return (
           <div className="p-8 text-center pixel-panel">

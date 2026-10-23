@@ -1,299 +1,277 @@
 import React, { useState } from 'react';
 import { useGame } from '../../context/GameContext';
-import { YukiShrineOracle } from './YukiShrineOracle';
 import { FragmentPixelBadge } from '../PixelArtwork';
-import { ArrowLeft, Unlock, Lock, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Lock, Sparkles, CheckCircle2, ChevronRight } from 'lucide-react';
 import { soundManager } from '../../utils/audio';
+import { GEMSTONES } from '../../data/gameData';
+import { GemstoneId } from '../../types/game';
 
-export const ShrineOfMemoriesMechanism: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { state, unlockMechanism } = useGame();
+interface ShrineOfMemoriesMechanismProps {
+  onBack: () => void;
+}
 
-  const hasSeal1 = Boolean(state.solvedPuzzles.japan_puzzle_1);
-  const hasSeal2 = Boolean(state.solvedPuzzles.japan_puzzle_2);
-  const isMechanismAlreadyUnlocked = state.unlockedMechanisms.japan_mechanism;
+const JAPAN_GEMS: { id: GemstoneId; slotLabel: string }[] = [
+  { id: 'rose_quartz', slotLabel: 'BLOSSOM ROSE QUARTZ' },
+  { id: 'moonstone', slotLabel: 'LUMINESCENT MOONSTONE' },
+  { id: 'amethyst', slotLabel: 'TWILIGHT BELL AMETHYST' },
+  { id: 'obsidian', slotLabel: 'SOVEREIGN OBSIDIAN' },
+];
 
-  const [slottedSeal1, setSlottedSeal1] = useState<boolean>(isMechanismAlreadyUnlocked || hasSeal1);
-  const [slottedSeal2, setSlottedSeal2] = useState<boolean>(isMechanismAlreadyUnlocked || hasSeal2);
-  const [lanternPhase, setLanternPhase] = useState<number>(isMechanismAlreadyUnlocked ? 3 : 0);
+export const ShrineOfMemoriesMechanism: React.FC<ShrineOfMemoriesMechanismProps> = ({ onBack }) => {
+  const { state, unlockMechanism, socketGemstone, selectCivilization } = useGame();
+
+  const isMechanismAlreadyUnlocked = Boolean(state.unlockedMechanisms.japan_mechanism);
+  const socketed = state.socketedGemstones.japan_mechanism || [];
+
+  const [localSocketed, setLocalSocketed] = useState<GemstoneId[]>(() => {
+    return isMechanismAlreadyUnlocked 
+      ? ['rose_quartz', 'moonstone', 'amethyst', 'obsidian'] 
+      : socketed;
+  });
+
+  const [lanternPhase, setLanternPhase] = useState<number>(isMechanismAlreadyUnlocked ? 4 : 0);
   const [gateOpen, setGateOpen] = useState<boolean>(isMechanismAlreadyUnlocked);
   const [animating, setAnimating] = useState<boolean>(false);
 
-  const canActivate = hasSeal1 && hasSeal2 && !gateOpen;
+  const ownedGems = JAPAN_GEMS.map(g => ({
+    ...g,
+    gem: GEMSTONES[g.id],
+    isOwned: Boolean(state.collectedGemstones[g.id] || state.solvedPuzzles[GEMSTONES[g.id].earnedFromPuzzleId]),
+    isSocketed: localSocketed.includes(g.id),
+  }));
 
-  const handleSlotSeal = (sealNum: 1 | 2) => {
-    if (gateOpen || animating) return;
-    soundManager.playClick(state.soundEnabled);
-    if (sealNum === 1) setSlottedSeal1(true);
-    if (sealNum === 2) setSlottedSeal2(true);
+  const all4Socketed = JAPAN_GEMS.every(g => localSocketed.includes(g.id));
+  const hasAll4Owned = ownedGems.every(g => g.isOwned);
+
+  const handleSocketOne = (gemId: GemstoneId) => {
+    if (gateOpen || animating || localSocketed.includes(gemId)) return;
+    const isOwned = Boolean(state.collectedGemstones[gemId] || state.solvedPuzzles[GEMSTONES[gemId].earnedFromPuzzleId]);
+    if (!isOwned) {
+      soundManager.playCancel(state.soundEnabled);
+      return;
+    }
+
+    soundManager.playSnapKeystone(state.soundEnabled);
+    const updated = [...localSocketed, gemId];
+    setLocalSocketed(updated);
+    socketGemstone('japan_mechanism', gemId);
+  };
+
+  const handleSocketAll = () => {
+    if (gateOpen || animating || !hasAll4Owned) return;
+    soundManager.playSnapKeystone(state.soundEnabled);
+    const all = ['rose_quartz', 'moonstone', 'amethyst', 'obsidian'] as GemstoneId[];
+    setLocalSocketed(all);
+    all.forEach(g => socketGemstone('japan_mechanism', g));
   };
 
   const handleActivateGate = () => {
-    if (!slottedSeal1 || !slottedSeal2 || gateOpen || animating) return;
+    if (!all4Socketed || gateOpen || animating) return;
 
     setAnimating(true);
     soundManager.playBell(0, state.soundEnabled);
 
-    // Illuminate Lantern 1
+    // Lantern step 1
     setTimeout(() => {
       setLanternPhase(1);
       soundManager.playBell(1, state.soundEnabled);
 
-      // Illuminate Lantern 2
+      // Lantern step 2
       setTimeout(() => {
         setLanternPhase(2);
         soundManager.playBell(2, state.soundEnabled);
 
-        // Illuminate Altar Center Lantern
+        // Lantern step 3
         setTimeout(() => {
           setLanternPhase(3);
           soundManager.playBell(3, state.soundEnabled);
 
-          // Open Torii Gate with stone mechanism sound
+          // Lantern step 4 + Torii open
           setTimeout(() => {
+            setLanternPhase(4);
             soundManager.playGateOpen(state.soundEnabled);
-            setGateOpen(true);
-            setAnimating(false);
-            soundManager.playSolve(state.soundEnabled);
-            unlockMechanism('japan_mechanism');
-          }, 600);
+
+            setTimeout(() => {
+              setGateOpen(true);
+              setAnimating(false);
+              soundManager.playSolve(state.soundEnabled);
+              unlockMechanism('japan_mechanism');
+            }, 700);
+          }, 500);
         }, 500);
       }, 500);
-    }, 500);
+    }, 400);
   };
 
   return (
-    <div className="relative min-h-[580px] w-full max-w-4xl mx-auto p-4 md:p-6 bg-zinc-950/95 border-4 border-sky-800 shadow-[0_0_35px_rgba(2,132,199,0.3)] text-zinc-100 flex flex-col justify-between">
+    <div className="relative min-h-[620px] w-full max-w-4xl mx-auto p-4 md:p-6 bg-[#161224] border-4 border-[#38bdf8] shadow-[0_0_35px_rgba(56,189,248,0.35)] text-[#e3dfb1] flex flex-col justify-between select-none">
       {/* Top Header */}
-      <div className="flex items-center justify-between border-b-2 border-zinc-800 pb-3 mb-4">
-        <button
-          onClick={onBack}
-          className="pixel-btn px-3 py-1.5 flex items-center gap-1.5 border-2 border-zinc-700 bg-zinc-900 text-zinc-300 font-pixel text-xs hover:text-white"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>BACK</span>
-        </button>
-
-        <div className="text-center">
-          <span className="font-pixel text-[10px] text-sky-400">JAPAN · SACRED MECHANISM</span>
-          <h2 className="text-sm md:text-base font-pixel text-zinc-100">
-            THE SHRINE OF MEMORIES
-          </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-[#3a334a] pb-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              soundManager.playCancel(state.soundEnabled);
+              onBack();
+            }}
+            className="pixel-btn min-h-[44px] px-3.5 text-[14px] flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>BACK</span>
+          </button>
+          <div>
+            <div className="font-pixel text-[12px] text-[#38bdf8]">FEUDAL JAPAN · GRAND MECHANISM</div>
+            <h2 className="font-pixel text-[18px] md:text-[22px] text-[#ffffff]">THE SHRINE OF MEMORIES</h2>
+          </div>
         </div>
 
-        <div className="w-16" />
-      </div>
-
-      {/* Main Altar Playfield */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center my-auto">
-        {/* Left: Companion Yuki advice */}
-        <div className="md:col-span-4 flex flex-col items-center md:items-start p-4 bg-zinc-900 border-2 border-sky-900/60">
-          <div className="flex items-center gap-3 mb-3">
-            <YukiShrineOracle size="md" interactive={false} />
-            <div>
-              <div className="font-pixel text-xs text-sky-400">YUKI</div>
-              <div className="text-[10px] text-zinc-400 font-silkscreen">Shrine Oracle</div>
+        <div className="flex items-center gap-2">
+          {gateOpen ? (
+            <div className="font-pixel text-[13px] text-[#6ee7b7] flex items-center gap-2 px-3.5 py-1.5 bg-[#142e22] border-2 border-[#10b981]">
+              <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
+              <span>SHRINE UNLOCKED</span>
             </div>
-          </div>
-          <p className="font-silkscreen text-xs text-zinc-300 leading-relaxed mb-4">
-            "The Torii gate requires the twin Spirit Seals from both chambers. Slot them into the stone altar to ignite the sacred lanterns and release the Celestial Mirror."
-          </p>
-
-          {/* Requirements Checklist */}
-          <div className="w-full space-y-2 text-xs font-silkscreen p-3 bg-zinc-950 border border-zinc-800 mb-3">
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-300">1. Spirit Seal 1 (Shoji Screen)</span>
-              <span className={hasSeal1 ? 'text-emerald-400 font-pixel text-[9px]' : 'text-red-400 font-pixel text-[9px]'}>
-                {hasSeal1 ? 'RECOVERED' : 'MISSING'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-zinc-300">2. Spirit Seal 2 (Bell Belfry)</span>
-              <span className={hasSeal2 ? 'text-emerald-400 font-pixel text-[9px]' : 'text-red-400 font-pixel text-[9px]'}>
-                {hasSeal2 ? 'RECOVERED' : 'MISSING'}
-              </span>
-            </div>
-          </div>
-
-          {gateOpen && (
-            <div className="w-full p-3 bg-sky-950/60 border-2 border-sky-400 text-sky-200 font-pixel text-xs flex items-center gap-2 animate-in fade-in duration-300">
-              <Sparkles className="w-5 h-5 text-sky-400 shrink-0" />
-              <div>
-                <div>TORII GATE OPENED!</div>
-                <div className="text-[9px] text-sky-300 font-silkscreen mt-0.5">
-                  Celestial Mirror Revealed · Egypt Unlocked
-                </div>
-              </div>
+          ) : (
+            <div className="font-pixel text-[13px] text-[#38bdf8] flex items-center gap-2 px-3.5 py-1.5 bg-[#162534] border-2 border-[#38bdf8]">
+              <Lock className="w-4 h-4 text-[#38bdf8]" />
+              <span>{all4Socketed ? 'READY TO AWAKEN' : `${localSocketed.length}/4 KEYS SOCKETED`}</span>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Right: The Grand Vermilion Torii Gate & Altar Slots */}
-        <div className="md:col-span-8 flex flex-col items-center">
-          {/* Animated Torii Gate Viewport */}
-          <div className="relative w-full max-w-md aspect-[4/3] bg-gradient-to-b from-[#091528] to-[#12081f] border-4 border-[#334155] shadow-[0_0_25px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col items-center justify-end p-4">
-            {/* Mountain mist & Cherry blossom particles in background */}
-            <div className="absolute inset-0 pointer-events-none opacity-40">
-              <div className="absolute top-6 left-8 w-24 h-12 bg-sky-200/10 blur-md rounded-full" />
-              <div className="absolute top-12 right-12 w-32 h-14 bg-sky-200/10 blur-md rounded-full" />
-              {/* Sun disk */}
-              <circle cx="200" cy="80" r="32" fill="#dc2626" opacity="0.65" />
-            </div>
+      {/* Main Altar Area */}
+      <div className="relative z-10 my-4 flex flex-col items-center">
+        {/* Environmental Guardian Altar Banner */}
+        <div className="w-full max-w-xl mb-4 px-4 py-2.5 bg-[#172230] border-2 border-[#38bdf8] text-center shadow-[0_3px_0_#000]">
+          <span className="font-silkscreen text-[14px] text-[#7dd3fc]">
+            {gateOpen
+              ? 'THE SACRED TORII HAS OPENED · CELESTIAL MIRROR REVEALED'
+              : all4Socketed
+              ? 'ALL 4 SHRINE GEMS PLACED · IGNITE THE SPIRIT LANTERNS'
+              : 'PLACE 4 REGIONAL GEMSTONES INTO THE CEREMONIAL ALTAR'}
+          </span>
+        </div>
 
-            {/* Left Stone Lantern (Lantern 1) */}
-            <div className="absolute left-6 bottom-16 flex flex-col items-center">
-              <div
-                className={`w-5 h-5 border border-zinc-700 transition-all ${
-                  lanternPhase >= 1 ? 'bg-amber-400 shadow-[0_0_20px_#f59e0b]' : 'bg-zinc-800'
-                }`}
-              />
-              <div className="w-3 h-8 bg-zinc-700" />
-            </div>
+        {/* Central Torii Gate & Spirit Altar Graphic */}
+        <div className="relative w-64 h-64 md:w-80 md:h-80 border-4 border-[#38bdf8] bg-[#110e1e] shadow-[inset_0_0_35px_rgba(0,0,0,0.9)] flex items-center justify-center overflow-hidden p-4">
+          {/* Torii Gate Outline */}
+          <div className="relative w-52 h-52 md:w-64 md:h-64 flex flex-col items-center justify-center">
+            {/* Top Beam */}
+            <div className="w-44 md:w-56 h-4 bg-[#f43f5e] border-2 border-[#fda4af] shadow-[0_0_15px_rgba(244,63,94,0.6)] mb-1" />
+            <div className="w-36 md:w-48 h-2 bg-[#e11d48] border-b border-[#fda4af] mb-4" />
 
-            {/* Right Stone Lantern (Lantern 2) */}
-            <div className="absolute right-6 bottom-16 flex flex-col items-center">
-              <div
-                className={`w-5 h-5 border border-zinc-700 transition-all ${
-                  lanternPhase >= 2 ? 'bg-amber-400 shadow-[0_0_20px_#f59e0b]' : 'bg-zinc-800'
-                }`}
-              />
-              <div className="w-3 h-8 bg-zinc-700" />
-            </div>
+            {/* Pillars & Lanterns */}
+            <div className="w-36 md:w-48 flex justify-between items-center relative h-32">
+              <div className="w-4 h-full bg-[#f43f5e] border-r-2 border-[#fda4af]" />
 
-            {/* The Vermilion Torii Gate */}
-            <div className="relative z-10 w-64 h-56 flex flex-col items-center justify-between">
-              {/* Torii Top Crossbeam */}
-              <div className="w-full h-5 bg-[#dc2626] border-2 border-[#991b1b] shadow-md rounded-xs" />
-              <div className="w-56 h-3 bg-[#b91c1c] border border-[#7f1d1d] -mt-1" />
-
-              {/* Shrine Center Chamber (Behind the sliding gate doors) */}
-              <div className="relative w-44 h-36 border-2 border-[#451a03] bg-[#1a0e05] overflow-hidden flex items-center justify-center">
-                {/* Revealed Fragment 2: Celestial Mirror */}
+              {/* Center Basin / Mirror / Gate Opening */}
+              <div className="w-24 h-24 border-3 border-[#38bdf8] bg-[#192233] flex items-center justify-center relative">
                 {gateOpen ? (
-                  <div className="flex flex-col items-center animate-in zoom-in-75 duration-700">
-                    <div className="relative mb-2">
-                      <div className="w-16 h-16 rounded-full border-4 border-sky-400 bg-sky-950 flex items-center justify-center text-3xl shadow-[0_0_30px_#38bdf8]">
-                        ⛩
-                      </div>
-                      <div className="absolute -inset-2 rounded-full border border-sky-300 animate-ping opacity-40" />
-                    </div>
-                    <span className="font-pixel text-[9px] text-sky-300">
-                      CELESTIAL MIRROR
-                    </span>
-                    <span className="text-[8px] text-zinc-400 font-silkscreen">
-                      Artifact Fragment 2
-                    </span>
+                  <div className="flex flex-col items-center justify-center animate-in zoom-in-75 duration-500">
+                    <FragmentPixelBadge fragmentId="fragment_celestial_mirror" collected={true} size="md" />
+                    <span className="font-pixel text-[11px] text-[#7dd3fc] mt-1">MIRROR</span>
                   </div>
                 ) : (
-                  <div className="text-center font-pixel text-[9px] text-zinc-600">
-                    VAULT SEALED
-                  </div>
+                  <span className="text-3xl text-[#38bdf8] opacity-75">⛩</span>
                 )}
-
-                {/* Sliding Gate Doors (Open when gateOpen is true) */}
-                <div
-                  className={`absolute top-0 left-0 w-1/2 h-full bg-[#7f1d1d] border-r border-[#991b1b] transition-transform duration-700 ease-in-out ${
-                    gateOpen ? '-translate-x-full' : 'translate-x-0'
-                  }`}
-                />
-                <div
-                  className={`absolute top-0 right-0 w-1/2 h-full bg-[#7f1d1d] border-l border-[#991b1b] transition-transform duration-700 ease-in-out ${
-                    gateOpen ? 'translate-x-full' : 'translate-x-0'
-                  }`}
-                />
               </div>
 
-              {/* Torii Pillars */}
-              <div className="w-full flex justify-between px-3">
-                <div className="w-5 h-16 bg-[#dc2626] border border-[#991b1b]" />
-                <div className="w-5 h-16 bg-[#dc2626] border border-[#991b1b]" />
-              </div>
+              <div className="w-4 h-full bg-[#f43f5e] border-l-2 border-[#fda4af]" />
             </div>
 
-            {/* Stone Altar Receptacle Matrix */}
-            <div className="relative z-20 w-full max-w-xs p-3 bg-zinc-900 border-2 border-zinc-700 flex items-center justify-around mt-2">
-              {/* Receptacle 1 (Spirit Seal 1) */}
-              <button
-                onClick={() => handleSlotSeal(1)}
-                disabled={!hasSeal1 || slottedSeal1 || gateOpen}
-                className={`w-14 h-14 border-2 flex flex-col items-center justify-center transition-all ${
-                  slottedSeal1
-                    ? 'border-sky-400 bg-sky-950 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.5)]'
-                    : hasSeal1
-                    ? 'border-amber-400 bg-amber-950/80 text-amber-300 animate-pulse cursor-pointer'
-                    : 'border-zinc-800 bg-zinc-950 text-zinc-700 cursor-not-allowed'
-                }`}
-                title="Slot Spirit Seal 1"
-              >
-                <span className="text-lg">{slottedSeal1 ? '🎐' : '❓'}</span>
-                <span className="font-pixel text-[7px] mt-0.5">
-                  {slottedSeal1 ? 'SEAL 1' : hasSeal1 ? 'SLOT 1' : 'LOCKED'}
-                </span>
-              </button>
-
-              {/* Center Altar Flame (Lantern 3) */}
-              <div
-                className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
-                  lanternPhase >= 3
-                    ? 'border-amber-300 bg-amber-400 text-black shadow-[0_0_20px_#f59e0b]'
-                    : 'border-zinc-800 bg-zinc-950 text-zinc-700'
-                }`}
-              >
-                <span className="text-xs">🏮</span>
-              </div>
-
-              {/* Receptacle 2 (Spirit Seal 2) */}
-              <button
-                onClick={() => handleSlotSeal(2)}
-                disabled={!hasSeal2 || slottedSeal2 || gateOpen}
-                className={`w-14 h-14 border-2 flex flex-col items-center justify-center transition-all ${
-                  slottedSeal2
-                    ? 'border-sky-400 bg-sky-950 text-sky-300 shadow-[0_0_12px_rgba(56,189,248,0.5)]'
-                    : hasSeal2
-                    ? 'border-amber-400 bg-amber-950/80 text-amber-300 animate-pulse cursor-pointer'
-                    : 'border-zinc-800 bg-zinc-950 text-zinc-700 cursor-not-allowed'
-                }`}
-                title="Slot Spirit Seal 2"
-              >
-                <span className="text-lg">{slottedSeal2 ? '📿' : '❓'}</span>
-                <span className="font-pixel text-[7px] mt-0.5">
-                  {slottedSeal2 ? 'SEAL 2' : hasSeal2 ? 'SLOT 2' : 'LOCKED'}
-                </span>
-              </button>
+            {/* 4 Altar Lanterns */}
+            <div className="flex items-center gap-3 mt-3">
+              {[1, 2, 3, 4].map(idx => {
+                const isLit = lanternPhase >= idx;
+                return (
+                  <div
+                    key={idx}
+                    className={`w-6 h-8 border-2 flex items-center justify-center text-xs transition-all ${
+                      isLit
+                        ? 'border-[#fde047] bg-[#ca8a04] shadow-[0_0_15px_rgba(253,224,71,0.8)] text-[#ffffff]'
+                        : 'border-[#475569] bg-[#1e293b] text-[#64748b]'
+                    }`}
+                  >
+                    🏮
+                  </div>
+                );
+              })}
             </div>
           </div>
+        </div>
 
-          {/* Action Button */}
-          {!gateOpen && (
+        {/* 4 Gemstone Sockets Grid */}
+        <div className="w-full max-w-xl mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {ownedGems.map(item => {
+            return (
+              <div
+                key={item.id}
+                onClick={() => item.isOwned && !item.isSocketed && handleSocketOne(item.id)}
+                className={`p-3 border-3 flex flex-col items-center justify-center text-center transition-all min-h-[96px] ${
+                  item.isSocketed
+                    ? 'border-[#10b981] bg-[#142e22] text-[#e3dfb1] shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                    : item.isOwned
+                    ? 'border-[#38bdf8] bg-[#1b273b] hover:border-[#7dd3fc] cursor-pointer text-[#ffffff] animate-pixel-glow'
+                    : 'border-[#3a334a] bg-[#151120] text-[#676b76] opacity-60 cursor-not-allowed'
+                }`}
+                title={item.isOwned ? `Click to socket ${item.gem.name}` : `${item.gem.name} (Not yet collected)`}
+              >
+                <div
+                  className="w-10 h-10 border-2 border-current flex items-center justify-center text-xl mb-1.5"
+                  style={{ color: item.gem.hexColor }}
+                >
+                  {item.isSocketed ? item.gem.icon : item.isOwned ? item.gem.icon : <Lock className="w-4 h-4 text-[#676b76]" />}
+                </div>
+                <div className="font-silkscreen text-[12px] font-bold text-[#ffffff] leading-tight">
+                  {item.gem.name.split(' ')[0]}
+                </div>
+                <div className="font-silkscreen text-[11px] mt-0.5" style={{ color: item.isSocketed ? '#10b981' : item.gem.hexColor }}>
+                  {item.isSocketed ? 'SOCKETED' : item.isOwned ? 'READY' : 'LOCKED'}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Bottom Action Footer */}
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pt-3 border-t-2 border-[#3a334a]">
+        <div>
+          {!all4Socketed && hasAll4Owned && (
             <button
-              onClick={handleActivateGate}
-              disabled={!slottedSeal1 || !slottedSeal2 || animating}
-              className={`pixel-btn px-6 py-3 mt-4 font-pixel text-xs font-bold border-2 flex items-center gap-2 transition-all ${
-                slottedSeal1 && slottedSeal2
-                  ? 'bg-sky-500 hover:bg-sky-400 text-zinc-950 border-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.6)] cursor-pointer'
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-600 cursor-not-allowed'
-              }`}
+              onClick={handleSocketAll}
+              className="pixel-btn pixel-btn-primary min-h-[44px] px-5 text-[14px] flex items-center gap-2"
             >
-              <Unlock className="w-4 h-4" />
-              <span>{animating ? 'IGNITING LANTERNS...' : 'OPEN TORII SPIRIT GATE'}</span>
+              <Sparkles className="w-4 h-4" />
+              <span>PLACE ALL 4 KEYS</span>
             </button>
           )}
         </div>
-      </div>
 
-      {/* Footer Controls */}
-      <div className="pt-3 border-t-2 border-zinc-800 flex items-center justify-between text-xs font-silkscreen">
-        <span className="text-zinc-400">
-          Mechanism State: <strong className={gateOpen ? 'text-sky-300 font-pixel text-[11px]' : 'text-amber-400 font-pixel text-[11px]'}>
-            {gateOpen ? 'GATE RELEASED · EGYPT UNLOCKED' : 'SEALS REQUIRED'}
-          </strong>
-        </span>
-
-        <button
-          onClick={onBack}
-          className="pixel-btn px-4 py-1.5 border border-zinc-700 bg-zinc-800 text-zinc-300 font-pixel text-xs hover:text-white"
-        >
-          RETURN TO SHRINE
-        </button>
+        <div className="flex items-center gap-3">
+          {gateOpen ? (
+            <button
+              onClick={() => selectCivilization('egypt')}
+              className="pixel-btn pixel-btn-primary min-h-[44px] px-6 text-[15px] flex items-center gap-2"
+            >
+              <span>CONTINUE TO EGYPT</span>
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              onClick={handleActivateGate}
+              disabled={!all4Socketed || animating}
+              className={`min-h-[44px] px-6 text-[15px] pixel-btn flex items-center gap-2 font-pixel ${
+                all4Socketed && !animating
+                  ? 'pixel-btn-primary animate-pixel-glow cursor-pointer'
+                  : 'border-[#3a334a] bg-[#151120] text-[#676b76] cursor-not-allowed opacity-60'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>{animating ? 'ILLUMINATING...' : 'ILLUMINATE SHRINE'}</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
