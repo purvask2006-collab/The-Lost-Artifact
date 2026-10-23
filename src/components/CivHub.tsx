@@ -9,7 +9,8 @@ import {
   CheckCircle2, 
   Lock, 
   Cog, 
-  Sparkles 
+  Sparkles,
+  FastForward 
 } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
@@ -18,7 +19,10 @@ export const CivHub: React.FC = () => {
     state, 
     returnToWorldMap, 
     openChamber, 
-    openMechanism 
+    openMechanism,
+    solvePuzzle,
+    solveCivChambers,
+    solveCivMechanism,
   } = useGame();
 
   const [showTray, setShowTray] = useState(false);
@@ -84,6 +88,25 @@ export const CivHub: React.FC = () => {
           </div>
         </div>
 
+        {/* Chambers Section Toolbar: Quick Solve All 4 Chambers Option */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1 border-b border-[#3a334a]/80 pb-2">
+          <div className="font-pixel text-[13px] text-[#e8b84a] flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[#e8b84a]" />
+            <span>FOUR SACRED CHAMBERS</span>
+          </div>
+
+          {!all4PuzzlesSolved && (
+            <button
+              onClick={() => solveCivChambers(civId)}
+              className="pixel-btn min-h-[38px] px-3.5 border-2 border-[#e8b84a] bg-[#3a2818] hover:bg-[#4f3721] text-[#fef08a] font-silkscreen text-[13px] flex items-center gap-2 cursor-pointer shadow-[0_0_10px_rgba(232,184,74,0.3)] transition-all"
+              title="Auto-solve all 4 chambers in this realm and collect gemstone keys"
+            >
+              <FastForward className="w-4 h-4 text-amber-300" />
+              <span>SOLVE ALL 4 CHAMBERS</span>
+            </button>
+          )}
+        </div>
+
         {/* 4 Mini-Puzzle Stations Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {civ.puzzles.map((puzzle, index) => {
@@ -95,13 +118,12 @@ export const CivHub: React.FC = () => {
               <motion.div
                 key={puzzle.id}
                 whileHover={isAvailable ? { y: -4 } : {}}
-                onClick={() => handleOpenPuzzle(puzzle.id, !isAvailable)}
                 className={`pixel-panel p-4 flex flex-col justify-between transition-all ${
                   isSolved
-                    ? 'border-[#10b981] bg-[#1a2e26]/80 shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer'
+                    ? 'border-[#10b981] bg-[#1a2e26]/80 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
                     : isAvailable
-                    ? 'border-[#e8b84a] bg-[#2a1f14]/80 shadow-[0_0_15px_rgba(232,184,74,0.3)] cursor-pointer'
-                    : 'border-[#443c54] bg-[#151120]/80 opacity-60 cursor-not-allowed'
+                    ? 'border-[#e8b84a] bg-[#2a1f14]/80 shadow-[0_0_15px_rgba(232,184,74,0.3)]'
+                    : 'border-[#443c54] bg-[#151120]/80 opacity-60'
                 }`}
               >
                 <div>
@@ -130,33 +152,50 @@ export const CivHub: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Single-Action Tactile Button: 1-2 words max */}
-                <button
-                  className={`w-full min-h-[44px] pixel-btn text-[14px] flex items-center justify-center gap-2 ${
-                    isSolved
-                      ? 'border-[#10b981] text-[#6ee7b7] bg-[#12281e]'
-                      : isAvailable
-                      ? 'pixel-btn-primary'
-                      : 'border-[#443c54] text-[#676b76] bg-[#181324] cursor-not-allowed'
-                  }`}
-                >
-                  {isSolved ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
-                      <span>REPLAY</span>
-                    </>
-                  ) : isAvailable ? (
-                    <>
-                      <Play className="w-4 h-4 fill-current" />
-                      <span>PLAY</span>
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-4 h-4 text-[#676b76]" />
-                      <span>LOCKED</span>
-                    </>
+                {/* Tactile Buttons: PLAY, REPLAY, and quick SKIP */}
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={() => handleOpenPuzzle(puzzle.id, !isAvailable)}
+                    className={`flex-1 min-h-[44px] pixel-btn text-[14px] flex items-center justify-center gap-2 cursor-pointer ${
+                      isSolved
+                        ? 'border-[#10b981] text-[#6ee7b7] bg-[#12281e]'
+                        : isAvailable
+                        ? 'pixel-btn-primary'
+                        : 'border-[#443c54] text-[#676b76] bg-[#181324] cursor-not-allowed'
+                    }`}
+                  >
+                    {isSolved ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
+                        <span>REPLAY</span>
+                      </>
+                    ) : isAvailable ? (
+                      <>
+                        <Play className="w-4 h-4 fill-current" />
+                        <span>PLAY</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4 text-[#676b76]" />
+                        <span>LOCKED</span>
+                      </>
+                    )}
+                  </button>
+
+                  {!isSolved && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        solvePuzzle(puzzle.id);
+                      }}
+                      className="min-h-[44px] px-3 pixel-btn border-2 border-[#e8b84a] bg-[#3a2818] hover:bg-[#4f3721] text-[#fef08a] font-silkscreen text-[13px] flex items-center justify-center gap-1 cursor-pointer shrink-0 shadow-[0_0_8px_rgba(232,184,74,0.3)]"
+                      title={`Skip chamber and award ${puzzle.gemstone.name}`}
+                    >
+                      <FastForward className="w-4 h-4 text-amber-300" />
+                      <span>SKIP</span>
+                    </button>
                   )}
-                </button>
+                </div>
               </motion.div>
             );
           })}
@@ -165,13 +204,12 @@ export const CivHub: React.FC = () => {
         {/* Grand Regional Mechanism Station (Centered Set Piece) */}
         <motion.div
           whileHover={all4PuzzlesSolved || isMechanismUnlocked ? { scale: 1.01 } : {}}
-          onClick={handleOpenMechanism}
           className={`pixel-panel p-5 border-4 transition-all flex flex-col md:flex-row items-center justify-between gap-5 ${
             isMechanismUnlocked
-              ? 'border-[#10b981] bg-[#12241d]/90 shadow-[0_0_20px_rgba(16,185,129,0.4)] cursor-pointer'
+              ? 'border-[#10b981] bg-[#12241d]/90 shadow-[0_0_20px_rgba(16,185,129,0.4)]'
               : all4PuzzlesSolved
-              ? 'border-[#e8b84a] bg-[#3a2818]/90 animate-pixel-glow cursor-pointer'
-              : 'border-[#443c54] bg-[#1a1528]/80 opacity-75 cursor-not-allowed'
+              ? 'border-[#e8b84a] bg-[#3a2818]/90 animate-pixel-glow'
+              : 'border-[#443c54] bg-[#1a1528]/80 opacity-75'
           }`}
         >
           <div className="flex items-center gap-4 text-center md:text-left">
@@ -197,19 +235,36 @@ export const CivHub: React.FC = () => {
             </div>
           </div>
 
-          {/* Action button */}
-          <button
-            className={`min-h-[44px] px-6 py-2.5 pixel-btn text-[14px] shrink-0 flex items-center gap-2 ${
-              isMechanismUnlocked
-                ? 'border-[#10b981] text-[#6ee7b7] bg-[#163328]'
-                : all4PuzzlesSolved
-                ? 'pixel-btn-primary'
-                : 'border-[#443c54] text-[#676b76] bg-[#181324] cursor-not-allowed'
-            }`}
-          >
-            <Cog className="w-4 h-4" />
-            <span>{isMechanismUnlocked ? 'VIEW VAULT' : all4PuzzlesSolved ? 'UNLOCK' : 'SEALED'}</span>
-          </button>
+          {/* Action buttons: Direct view or instant auto-unlock */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {!isMechanismUnlocked && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  solveCivMechanism(civId);
+                }}
+                className="min-h-[44px] px-4 pixel-btn border-2 border-[#e8b84a] bg-[#3a2818] hover:bg-[#4f3721] text-[#fef08a] font-silkscreen text-[13px] flex items-center gap-2 cursor-pointer shadow-[0_0_10px_rgba(232,184,74,0.3)] transition-all"
+                title="Auto-socket keys and reveal artifact fragment"
+              >
+                <FastForward className="w-4 h-4 text-amber-300" />
+                <span>AUTO-UNLOCK</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleOpenMechanism}
+              className={`min-h-[44px] px-6 py-2.5 pixel-btn text-[14px] flex items-center gap-2 cursor-pointer ${
+                isMechanismUnlocked
+                  ? 'border-[#10b981] text-[#6ee7b7] bg-[#163328]'
+                  : all4PuzzlesSolved
+                  ? 'pixel-btn-primary'
+                  : 'border-[#443c54] text-[#676b76] bg-[#181324] cursor-not-allowed'
+              }`}
+            >
+              <Cog className="w-4 h-4" />
+              <span>{isMechanismUnlocked ? 'VIEW VAULT' : all4PuzzlesSolved ? 'UNLOCK' : 'SEALED'}</span>
+            </button>
+          </div>
         </motion.div>
       </main>
 

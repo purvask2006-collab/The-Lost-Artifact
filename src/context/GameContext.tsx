@@ -27,6 +27,10 @@ interface GameContextType {
   toggleCrtFilter: () => void;
   resetGame: () => void;
   solvePuzzle: (puzzleId: PuzzleId) => void;
+  skipCurrentPuzzle: () => void;
+  solveCivChambers: (civId: CivilizationId) => void;
+  solveCivMechanism: (civId: CivilizationId) => void;
+  solveAllChallenges: () => void;
   socketGemstone: (mechanismId: MechanismId, gemstoneId: GemstoneId) => void;
   unlockMechanism: (mechanismId: MechanismId) => void;
   assembleFinalArtifact: () => void;
@@ -378,6 +382,167 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   }, [state.soundEnabled, persistState]);
 
+  const skipCurrentPuzzle = useCallback(() => {
+    setState(prev => {
+      const activeId = prev.activePuzzleId;
+      if (!activeId) return prev;
+
+      soundManager.playSolve(state.soundEnabled);
+      const gemstoneEntry = Object.values(GEMSTONES).find(g => g.earnedFromPuzzleId === activeId);
+      const nextSolved = { ...prev.solvedPuzzles, [activeId]: true };
+      const nextGems = { ...prev.collectedGemstones };
+      if (gemstoneEntry) {
+        nextGems[gemstoneEntry.id] = true;
+      }
+
+      const next: GameState = {
+        ...prev,
+        solvedPuzzles: nextSolved,
+        collectedGemstones: nextGems,
+      };
+      persistState(next);
+      return next;
+    });
+  }, [state.soundEnabled, persistState]);
+
+  const solveCivChambers = useCallback((civId: CivilizationId) => {
+    soundManager.playSolve(state.soundEnabled);
+    setState(prev => {
+      const civ = CIVILIZATIONS[civId];
+      if (!civ) return prev;
+
+      const nextSolved = { ...prev.solvedPuzzles };
+      const nextGems = { ...prev.collectedGemstones };
+
+      civ.puzzles.forEach(p => {
+        nextSolved[p.id] = true;
+        nextGems[p.gemstone.id] = true;
+      });
+
+      const next: GameState = {
+        ...prev,
+        solvedPuzzles: nextSolved,
+        collectedGemstones: nextGems,
+      };
+      persistState(next);
+      return next;
+    });
+  }, [state.soundEnabled, persistState]);
+
+  const solveCivMechanism = useCallback((civId: CivilizationId) => {
+    soundManager.playGateOpen(state.soundEnabled);
+    setState(prev => {
+      const civ = CIVILIZATIONS[civId];
+      if (!civ) return prev;
+
+      const mechId = civ.mechanism.id;
+      const fragId = civ.fragmentId;
+
+      const nextSockets = {
+        ...prev.socketedGemstones,
+        [mechId]: [...civ.mechanism.requiredGemstones],
+      };
+
+      const nextMechs = {
+        ...prev.unlockedMechanisms,
+        [mechId]: true,
+      };
+
+      const nextFrags = {
+        ...prev.recoveredFragments,
+        [fragId]: true,
+      };
+
+      const nextUnlockedCivs = {
+        india: true,
+        japan: true,
+        egypt: true,
+      };
+
+      const next: GameState = {
+        ...prev,
+        socketedGemstones: nextSockets,
+        unlockedMechanisms: nextMechs,
+        recoveredFragments: nextFrags,
+        unlockedCivs: nextUnlockedCivs,
+      };
+      persistState(next);
+      return next;
+    });
+  }, [state.soundEnabled, persistState]);
+
+  const solveAllChallenges = useCallback(() => {
+    soundManager.playSolve(state.soundEnabled);
+    setState(prev => {
+      const allPuzzlesSolved: Record<PuzzleId, boolean> = {
+        india_puzzle_1: true,
+        india_puzzle_2: true,
+        india_puzzle_3: true,
+        india_puzzle_4: true,
+        japan_puzzle_1: true,
+        japan_puzzle_2: true,
+        japan_puzzle_3: true,
+        japan_puzzle_4: true,
+        egypt_puzzle_1: true,
+        egypt_puzzle_2: true,
+        egypt_puzzle_3: true,
+        egypt_puzzle_4: true,
+      };
+
+      const allGemstonesCollected: Record<GemstoneId, boolean> = {
+        ruby: true,
+        emerald: true,
+        sapphire: true,
+        citrine: true,
+        rose_quartz: true,
+        moonstone: true,
+        amethyst: true,
+        obsidian: true,
+        lapis_lazuli: true,
+        turquoise: true,
+        carnelian: true,
+        malachite: true,
+      };
+
+      const allSockets = {
+        india_mechanism: [...CIVILIZATIONS.india.mechanism.requiredGemstones],
+        japan_mechanism: [...CIVILIZATIONS.japan.mechanism.requiredGemstones],
+        egypt_mechanism: [...CIVILIZATIONS.egypt.mechanism.requiredGemstones],
+      };
+
+      const allMechsUnlocked = {
+        india_mechanism: true,
+        japan_mechanism: true,
+        egypt_mechanism: true,
+      };
+
+      const allFragmentsRecovered = {
+        fragment_solar_wheel: true,
+        fragment_celestial_mirror: true,
+        fragment_eternal_eye: true,
+      };
+
+      const allCivsUnlocked = {
+        india: true,
+        japan: true,
+        egypt: true,
+      };
+
+      const next: GameState = {
+        ...prev,
+        hasStarted: true,
+        unlockedCivs: allCivsUnlocked,
+        solvedPuzzles: allPuzzlesSolved,
+        collectedGemstones: allGemstonesCollected,
+        socketedGemstones: allSockets,
+        unlockedMechanisms: allMechsUnlocked,
+        recoveredFragments: allFragmentsRecovered,
+      };
+      persistState(next);
+      return next;
+    });
+  }, [state.soundEnabled, persistState]);
+
   const socketGemstone = useCallback((mechanismId: MechanismId, gemstoneId: GemstoneId) => {
     soundManager.playSnapKeystone(state.soundEnabled);
     setState(prev => {
@@ -487,6 +652,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         toggleCrtFilter,
         resetGame,
         solvePuzzle,
+        skipCurrentPuzzle,
+        solveCivChambers,
+        solveCivMechanism,
+        solveAllChallenges,
         socketGemstone,
         unlockMechanism,
         assembleFinalArtifact,

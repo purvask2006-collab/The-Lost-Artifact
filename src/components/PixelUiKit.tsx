@@ -9,7 +9,9 @@ import {
   X, 
   RotateCcw,
   Sparkles,
-  BookOpen
+  BookOpen,
+  FastForward,
+  CheckCircle2
 } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { soundManager } from '../utils/audio';
@@ -159,6 +161,8 @@ interface MinimalHUDProps {
   onBack?: () => void;
   onHint?: () => void;
   hasHint?: boolean;
+  onSkip?: () => void;
+  isAlreadySolved?: boolean;
   civId?: CivilizationId | null;
   onOpenJournal?: () => void;
   onOpenTray?: () => void;
@@ -168,6 +172,8 @@ export const MinimalHUD: React.FC<MinimalHUDProps> = ({
   onBack,
   onHint,
   hasHint = false,
+  onSkip,
+  isAlreadySolved = false,
   civId,
   onOpenJournal,
   onOpenTray,
@@ -194,6 +200,17 @@ export const MinimalHUD: React.FC<MinimalHUDProps> = ({
 
       {/* Top Right Controls */}
       <div className="flex items-center gap-2">
+        {/* Optional Skip / Auto-Solve Button */}
+        {onSkip && !isAlreadySolved && (
+          <PixelIconButton
+            icon={<FastForward className="w-5 h-5 text-[#f59e0b]" />}
+            label="SKIP"
+            onClick={onSkip}
+            variant="primary"
+            title="Skip Challenge & Award Gemstone"
+          />
+        )}
+
         {/* Optional Hint Button */}
         {onHint && (
           <PixelIconButton

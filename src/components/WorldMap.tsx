@@ -3,6 +3,7 @@ import { useGame } from '../context/GameContext';
 import { PixelOverworldMap } from './PixelOverworldMap';
 import { HowToPlayModal } from './HowToPlayModal';
 import { ResetConfirmModal } from './ResetConfirmModal';
+import { SolveAllModal } from './SolveAllModal';
 import { InventoryModal } from './InventoryModal';
 import { FragmentPixelBadge, GuardianEnvironmentalDisplay } from './PixelArtwork';
 import { 
@@ -16,7 +17,8 @@ import {
   RotateCcw,
   Lock,
   CheckCircle2,
-  Play
+  Play,
+  FastForward
 } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
@@ -29,10 +31,12 @@ export const WorldMap: React.FC = () => {
     resetGame,
     goToScreen,
     selectCivilization,
+    solveAllChallenges,
   } = useGame();
 
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showSolveAllModal, setShowSolveAllModal] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
 
   const fragmentsCount = Object.values(state.recoveredFragments).filter(Boolean).length;
@@ -100,6 +104,19 @@ export const WorldMap: React.FC = () => {
 
         {/* Controls */}
         <div className="flex items-center gap-2">
+          {/* Solve All Challenges Shortcut */}
+          <button
+            onClick={() => {
+              soundManager.playClick(state.soundEnabled);
+              setShowSolveAllModal(true);
+            }}
+            className="pixel-btn px-2.5 py-1.5 flex items-center gap-1.5 border-2 border-emerald-500 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 font-pixel text-xs transition-colors cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+            title="Solve All Challenges Completely"
+          >
+            <FastForward className="w-3.5 h-3.5 text-emerald-300" />
+            <span className="hidden sm:inline">SOLVE ALL</span>
+          </button>
+
           {/* Codex Gemstones Inventory */}
           <button
             onClick={() => {
@@ -229,7 +246,7 @@ export const WorldMap: React.FC = () => {
           </button>
         </div>
 
-        {/* Global Assembly Trigger or Progress Count */}
+        {/* Global Assembly Trigger or Progress Count + Solve All option */}
         {fragmentsCount === 3 ? (
           <button
             onClick={() => goToScreen('ASSEMBLY')}
@@ -239,15 +256,34 @@ export const WorldMap: React.FC = () => {
             <span>ENTER FINAL CHAMBER (UNITE ARTIFACT)</span>
           </button>
         ) : (
-          <div className="text-zinc-400 text-xs">
-            <span>Puzzles Solved: <strong className="text-zinc-200">{puzzlesCount}/12</strong></span>
-            <span className="mx-2">·</span>
-            <span>Gemstones: <strong className="text-amber-400">{gemsCount}/12</strong></span>
+          <div className="flex items-center gap-3">
+            <div className="text-zinc-400 text-xs">
+              <span>Puzzles: <strong className="text-zinc-200">{puzzlesCount}/12</strong></span>
+              <span className="mx-2">·</span>
+              <span>Gemstones: <strong className="text-amber-400">{gemsCount}/12</strong></span>
+            </div>
+            <button
+              onClick={() => {
+                soundManager.playClick(state.soundEnabled);
+                setShowSolveAllModal(true);
+              }}
+              className="pixel-btn px-2.5 py-1 border border-emerald-600/80 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 text-[11px] flex items-center gap-1 cursor-pointer"
+            >
+              <FastForward className="w-3 h-3 text-emerald-400" />
+              <span>SOLVE ALL</span>
+            </button>
           </div>
         )}
       </footer>
 
       {/* Auxiliary Modals */}
+      <SolveAllModal
+        isOpen={showSolveAllModal}
+        onClose={() => setShowSolveAllModal(false)}
+        onConfirm={solveAllChallenges}
+        soundEnabled={state.soundEnabled}
+      />
+
       <HowToPlayModal
         isOpen={showHowToPlay}
         onClose={() => setShowHowToPlay(false)}

@@ -73,6 +73,12 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ isOpen, onClose,
                 <div className="text-[14px] text-[#e3dfb1]/80">Socket 4 gems to claim 3 fragments.</div>
               </div>
             </div>
+
+            {/* Convenience Note */}
+            <div className="p-2.5 bg-[#18231c] border border-[#10b981]/50 text-[13px] text-[#a7f3d0] flex items-center gap-2">
+              <span className="font-pixel text-xs text-[#10b981]">TIP:</span>
+              <span>Use <strong>SKIP</strong> in any chamber or <strong>SOLVE ALL</strong> on the map to progress instantly without delay!</span>
+            </div>
           </div>
 
           {/* Footer */}
